@@ -1,0 +1,1927 @@
+{% extends "app_layout.html" %}
+
+{% block title %}รายงาน Morning Audit สำนักงานขาย (ประจำวัน){% endblock %}
+
+{% block breadcrumb %}
+<span class="breadcrumb-item"><a href="{{ url_for('dashboard') }}">หน้าหลัก</a></span>
+<span class="breadcrumb-separator">/</span>
+<span class="breadcrumb-item active">รายงาน Morning Audit สำนักงานขาย</span>
+{% endblock %}
+
+{% block content %}
+<div class="sheet-form-page-container">
+    {% if current_user.role == 'ADMIN' %}
+    <div style="display: flex; justify-content: flex-end; margin-bottom: 12px;">
+        <a href="{{ url_for('morning_audit_history') }}" class="btn-sheet-secondary">
+            <i data-lucide="history"></i> ดูประวัติการตรวจ
+        </a>
+    </div>
+    {% endif %}
+
+    <!-- Official White Sheet Container -->
+    <div class="sheet-paper-container">
+        <!-- Locked Alert for Regular Users -->
+        <div id="morningAuditLockedBanner" style="{% if not (already_submitted_audit and current_user.role != 'ADMIN') %}display: none;{% else %}display: flex;{% endif %} margin-bottom: 16px; padding: 12px 18px; border-radius: 10px; background: #FFFBEB; border: 1.5px solid #FCD34D; color: #92400E; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;">
+            <div style="display: flex; align-items: center; gap: 10px;">
+                <i data-lucide="lock" style="width: 22px; height: 22px; color: #D97706; flex-shrink: 0;"></i>
+                <div>
+                    <div style="font-weight: 700; font-size: 0.95rem;" id="auditLockedTitle">{% if already_submitted_audit %}สาขา {{ already_submitted_audit.branch }} ได้ทำการส่งแบบตรวจ Morning Audit ประจำวันที่ {{ already_submitted_audit.audit_date }} เรียบร้อยแล้ว{% else %}สาขานี้ได้ทำการส่งแบบตรวจ Morning Audit ประจำวันนี้เรียบร้อยแล้ว{% endif %}</div>
+                    <div style="font-size: 0.82rem; color: #B45309;" id="auditLockedDesc">ข้อมูลการตรวจถูกส่งเข้าระบบเรียบร้อยแล้ว เพื่อรักษาความถูกต้องและความโปร่งใสของข้อมูล</div>
+                </div>
+            </div>
+            <a href="{% if already_submitted_audit %}{{ url_for('morning_audit_detail', audit_id=already_submitted_audit.id) }}{% else %}#{% endif %}" id="auditLockedLink" class="btn-sheet-secondary" style="font-size: 0.82rem; padding: 6px 12px; background: #FFFFFF; border: 1px solid #FCD34D; color: #92400E; text-decoration: none; border-radius: 6px; font-weight: 600; display: inline-flex; align-items: center; gap: 4px;">
+                <span>ดูรายงานผลการตรวจ</span> &raquo;
+            </a>
+        </div>
+
+        <form action="{{ url_for('morning_audit') }}" method="POST" id="morningAuditSheetForm">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+            <!-- HEADER SECTION -->
+            <div class="sheet-header-section sheet-header-centered">
+                <!-- Title (Centered) -->
+                <div class="sheet-title-centered">
+                    <strong>รายงาน Morning Audit สำนักงานขาย (ประจำวัน)</strong>
+                </div>
+
+                <!-- Fields Under Title (Centered) -->
+                <div class="sheet-center-fields">
+                    <div class="sheet-meta-field">
+                        <span class="sheet-field-label">สาขา</span>
+                        <select name="branch" id="branchMainInput" class="sheet-select-dotted" required
+                            onchange="syncBranchDate()">
+                            <option value="">กรุณาเลือกสาขา</option>
+                            {% for b in branches %}
+                            <option value="{{ b }}" {% if selected_branch==b %}selected{% endif %}>{{ b }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="sheet-meta-field" style="margin-top: 8px;">
+                        <span class="sheet-field-label">วันที่ตรวจ</span>
+                        <input type="date" name="audit_date" id="dateMainInput" class="sheet-input-dotted"
+                            value="{{ selected_date if selected_date else today }}" required
+                            onchange="syncBranchDate()">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Bar Above Table: Sync Branch & Date (Centered) -->
+            <div class="sheet-table-top-bar">
+                <div class="table-top-bar-center">
+                    <span>สาขา <span id="syncBranchDisplay"
+                            class="sync-val-box">....................................................</span></span>
+                    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+                    <span>วันที่ <span id="syncDateDisplay"
+                            class="sync-val-box">....................................................</span></span>
+                </div>
+            </div>
+
+            <!-- TABLE SECTION WITH SHARP BORDERS -->
+            <div class="sheet-table-wrapper">
+                <table class="audit-sheet-table" id="auditSheetTable">
+                    <thead>
+                        <!-- Main Columns Header -->
+                        <tr class="table-head-main-row">
+                            <th rowspan="2" class="col-no-head">No</th>
+                            <th rowspan="2" class="col-desc-head">
+                                รายการที่ต้องพร้อมสำหรับการต้อนรับลูกค้าและเปิดสำนักงานขาย</th>
+                            <th colspan="2" class="col-result-head">ผลการตรวจ</th>
+                            <th rowspan="2" class="col-evidence-head">บันทึกข้อสังเกต / สิ่งที่ไม่เป็นไปตามมาตรฐาน /
+                                evidence / หลักฐาน</th>
+                        </tr>
+                        <tr class="table-head-sub-row">
+                            <th class="col-pass-head">ผ่าน</th>
+                            <th class="col-fail-head">ไม่ผ่าน</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for category in sections %}
+                        <!-- Category Header Row -->
+                        <tr class="category-header-row">
+                            <td class="cat-no-cell"></td>
+                            <td colspan="4" class="cat-title-cell">
+                                <strong>{{ category.category_title }}</strong>
+                            </td>
+                        </tr>
+
+                        <!-- Item Rows -->
+                        {% for item in category.audit_items %}
+                        <tr class="audit-item-row" id="row_{{ item.id }}" data-item-id="{{ item.id }}">
+                            <!-- No Column -->
+                            <td class="col-no-cell">{{ item.no }}</td>
+
+                            <!-- Description Column -->
+                            <td class="col-desc-cell">{{ item.title }}</td>
+
+                            <!-- Pass Checkbox Column -->
+                            <td class="col-check-cell col-pass-cell" onclick="selectStatus('{{ item.id }}', 'PASS')">
+                                <label class="sheet-checkbox-label">
+                                    <input type="radio" name="status_{{ item.id }}" value="PASS"
+                                        id="radio_pass_{{ item.id }}"
+                                        onchange="onStatusChange('{{ item.id }}', 'PASS')">
+                                    <span class="custom-sheet-check check-pass" id="box_pass_{{ item.id }}">
+                                        <i data-lucide="check" class="mark-icon"></i>
+                                    </span>
+                                </label>
+                            </td>
+
+                            <!-- Fail Checkbox Column -->
+                            <td class="col-check-cell col-fail-cell" onclick="selectStatus('{{ item.id }}', 'FAIL')">
+                                <label class="sheet-checkbox-label">
+                                    <input type="radio" name="status_{{ item.id }}" value="FAIL"
+                                        id="radio_fail_{{ item.id }}"
+                                        onchange="onStatusChange('{{ item.id }}', 'FAIL')">
+                                    <span class="custom-sheet-check check-fail" id="box_fail_{{ item.id }}">
+                                        <i data-lucide="x" class="mark-icon"></i>
+                                    </span>
+                                </label>
+                            </td>
+
+                            <!-- Evidence / Observation Column (Grayed out if PASS, Active if FAIL) -->
+                            <td class="col-evidence-cell" id="evidence_cell_{{ item.id }}">
+                                <div class="evidence-inline-content" id="evidence_content_{{ item.id }}">
+                                    <!-- Render specific dotted input template based on item id -->
+                                    {% if item.id == 'c1_1' %}
+                                    กรณีพบว่าป้ายซีดหรือชำรุด <input type="text" name="c1_1_defect"
+                                        class="sheet-inline-input input-wide" placeholder="ระบุรายละเอียดป้าย..."> /
+                                    Target แก้ไขแล้วเสร็จ <input type="date" name="c1_1_target"
+                                        class="sheet-inline-input input-date">
+                                    {% elif item.id == 'c1_2' %}
+                                    กรณีพบว่าป้ายซีดหรือชำรุด <input type="text" name="c1_2_defect"
+                                        class="sheet-inline-input input-wide" placeholder="ระบุจุดที่ชำรุด..."> / Target
+                                    แก้ไขแล้วเสร็จ <input type="date" name="c1_2_target"
+                                        class="sheet-inline-input input-date">
+                                    {% elif item.id == 'c1_3' %}
+                                    กรณีพบว่าบริเวณใดไม่สะอาด <input type="text" name="c1_3_defect"
+                                        class="sheet-inline-input input-wide" placeholder="ระบุบริเวณ/ปัญหา..."> /
+                                    Target แก้ไขแล้วเสร็จ <input type="date" name="c1_3_target"
+                                        class="sheet-inline-input input-date">
+                                    {% elif item.id == 'c1_4' %}
+                                    กรณีพบว่าเคาน์เตอร์ไม่สะอาด <input type="text" name="c1_4_defect"
+                                        class="sheet-inline-input input-wide" placeholder="ระบุสิ่งที่ต้องปรับปรุง...">
+                                    / Target แก้ไขแล้วเสร็จ <input type="date" name="c1_4_target"
+                                        class="sheet-inline-input input-date">
+                                    {% elif item.id == 'c1_5' %}
+                                    ชื่อโมเดลชำรุด <input type="text" name="c1_5_defect"
+                                        class="sheet-inline-input input-wide"
+                                        placeholder="ระบุเฟอร์นิเจอร์/Built-in..."> / Target ซ่อมแล้วเสร็จ <input
+                                        type="date" name="c1_5_target" class="sheet-inline-input input-date">
+                                    {% elif item.id == 'c1_6' %}
+                                    กรณีแคตตาล็อกไม่ครบ <input type="text" name="c1_6_defect" class="sheet-inline-input"
+                                        placeholder="ระบุรายการ..."> / จำนวนที่เบิกเพิ่ม <input type="number"
+                                        name="c1_6_qty" class="sheet-inline-input input-short" placeholder="0"> เล่ม
+                                    {% elif item.id == 'c1_7' %}
+                                    ระบุชื่อไฟล์ TV <input type="text" name="c1_7_file"
+                                        class="sheet-inline-input input-full"
+                                        placeholder="ระบุชื่อไฟล์ TV หรือปัญหาที่พบ...">
+                                    {% elif item.id == 'c1_8' %}
+                                    อุณหภูมิ <input type="number" name="c1_8_temp"
+                                        class="sheet-inline-input input-short" placeholder="24"> °C /
+                                    กรณีเครื่องปรับอากาศเสีย Target ซ่อม <input type="date" name="c1_8_target"
+                                        class="sheet-inline-input input-date">
+                                    {% elif item.id == 'c1_9' %}
+                                    กรณีแสงสว่างไม่เพียงพอ (ระบุบริเวณ) <input type="text" name="c1_9_area"
+                                        class="sheet-inline-input input-wide" placeholder="ระบุบริเวณ..."> / Target
+                                    แก้ไขแล้วเสร็จ <input type="date" name="c1_9_target"
+                                        class="sheet-inline-input input-date">
+                                    {% elif item.id == 'c1_10' %}
+                                    กรณีชำรุด <input type="text" name="c1_10_defect"
+                                        class="sheet-inline-input input-wide" placeholder="ระบุจุดที่ชำรุด..."> / Target
+                                    แก้ไขแล้วเสร็จ <input type="date" name="c1_10_target"
+                                        class="sheet-inline-input input-date">
+                                    {% elif item.id == 'c1_11' %}
+                                    ชื่อกลิ่นหอมที่ใช้งาน <input type="text" name="c1_11_scent"
+                                        class="sheet-inline-input input-full"
+                                        placeholder="ระบุชื่อกลิ่นหอมที่ใช้งาน...">
+                                    {% elif item.id == 'c1_12' %}
+                                    โปรดระบุชื่อไฟล์เพลง <input type="text" name="c1_12_song"
+                                        class="sheet-inline-input input-full" placeholder="ระบุชื่อไฟล์เพลงที่เปิด...">
+                                    {% elif item.id == 'c1_13' %}
+                                    วันที่ขนมหมดอายุ <input type="date" name="c1_13_snack_exp"
+                                        class="sheet-inline-input input-date"> และเครื่องดื่มหมดอายุ <input type="date"
+                                        name="c1_13_drink_exp" class="sheet-inline-input input-date"> / น้ำดื่มเหลือ
+                                    <input type="number" name="c1_13_water_qty" class="sheet-inline-input input-short"
+                                        placeholder="0"> ขวด
+                                    {% elif item.id == 'c2_1' %}
+                                    ชื่อไฟล์ TV <input type="text" name="c2_1_file"
+                                        class="sheet-inline-input input-full"
+                                        placeholder="ระบุชื่อไฟล์ TV หรือปัญหาที่พบ...">
+                                    {% elif item.id == 'c2_2' %}
+                                    อุณหภูมิ <input type="number" name="c2_2_temp"
+                                        class="sheet-inline-input input-short" placeholder="24"> °C /
+                                    กรณีเครื่องปรับอากาศเสีย Target ซ่อม <input type="date" name="c2_2_target"
+                                        class="sheet-inline-input input-date">
+                                    {% elif item.id == 'c2_3' %}
+                                    จำนวนหลอดไฟที่ดับ <input type="number" name="c2_3_light_off"
+                                        class="sheet-inline-input input-short" placeholder="0"> ดวง / Target
+                                    ซ่อมแล้วเสร็จ <input type="date" name="c2_3_target"
+                                        class="sheet-inline-input input-date">
+                                    {% elif item.id == 'c2_4' %}
+                                    กรณีชำรุด <input type="text" name="c2_4_defect"
+                                        class="sheet-inline-input input-wide" placeholder="ระบุจุดที่ชำรุด..."> / Target
+                                    แก้ไขแล้วเสร็จ <input type="date" name="c2_4_target"
+                                        class="sheet-inline-input input-date">
+                                    {% elif item.id == 'c2_5' %}
+                                    ชื่อกลิ่นหอมที่ใช้งาน <input type="text" name="c2_5_scent"
+                                        class="sheet-inline-input input-full" placeholder="ระบุชื่อกลิ่นหอม...">
+                                    {% elif item.id == 'c2_6' %}
+                                    กรณีห้องไม่พร้อมใช้งาน <input type="text" name="c2_6_defect"
+                                        class="sheet-inline-input input-wide" placeholder="ระบุห้องหรือจุดที่พบ..."> /
+                                    Target แก้ไขแล้วเสร็จ <input type="date" name="c2_6_target"
+                                        class="sheet-inline-input input-date">
+                                    {% elif item.id == 'c2_7' %}
+                                    ข้อมูล Ipad ที่ยังไม่อัปเดต <input type="text" name="c2_7_defect"
+                                        class="sheet-inline-input input-wide"
+                                        placeholder="ระบุข้อมูลที่ยังไม่อัปเดต..."> / Target แก้ไขแล้วเสร็จ <input
+                                        type="date" name="c2_7_target" class="sheet-inline-input input-date">
+                                    {% elif item.id == 'c2_8' %}
+                                    กรณีแคตตาล็อกไม่ครบ <input type="text" name="c2_8_defect" class="sheet-inline-input"
+                                        placeholder="ระบุแบรนด์ที่ขาด..."> / จำนวนที่เบิกเพิ่ม <input type="number"
+                                        name="c2_8_qty" class="sheet-inline-input input-short" placeholder="0"> เล่ม
+                                    {% elif item.id == 'c2_9' %}
+                                    แปลน A3 ไม่ครบ (ระบุชื่อแบรนด์) <input type="text" name="c2_9_defect"
+                                        class="sheet-inline-input input-full" placeholder="ระบุชื่อแบรนด์ที่ขาด...">
+                                    {% elif item.id == 'c3_1' %}
+                                    ชื่อโมเดลชำรุด <input type="text" name="c3_1_defect" class="sheet-inline-input"
+                                        placeholder="ระบุชื่อโมเดล..."> หลัง / Target ซ่อมแล้วเสร็จ <input type="date"
+                                        name="c3_1_target" class="sheet-inline-input input-date">
+                                    {% elif item.id == 'c3_2' %}
+                                    แปลนบ้าน A3 ขาด <input type="number" name="c3_2_defect"
+                                        class="sheet-inline-input input-short" placeholder="0"> หลัง / Target
+                                    อัปเดตเรียบร้อย <input type="date" name="c3_2_target"
+                                        class="sheet-inline-input input-date">
+                                    {% elif item.id == 'c3_3' %}
+                                    ป้าย TIVE ซีด/ไม่ครบ <input type="number" name="c3_3_defect"
+                                        class="sheet-inline-input input-short" placeholder="0"> หลัง / Target
+                                    อัปเดตเรียบร้อย <input type="date" name="c3_3_target"
+                                        class="sheet-inline-input input-date">
+                                    {% elif item.id == 'c3_4' %}
+                                    ป้ายราคาที่ยังไม่อัปเดต <input type="number" name="c3_4_defect"
+                                        class="sheet-inline-input input-short" placeholder="0"> หลัง / Target
+                                    อัปเดตเรียบร้อย <input type="date" name="c3_4_target"
+                                        class="sheet-inline-input input-date">
+                                    {% elif item.id == 'c3_5' %}
+                                    แท่นวางโมเดลชำรุด <input type="number" name="c3_5_defect"
+                                        class="sheet-inline-input input-short" placeholder="0"> แท่น / Target
+                                    ซ่อมแล้วเสร็จ <input type="date" name="c3_5_target"
+                                        class="sheet-inline-input input-date">
+                                    {% elif item.id == 'c3_6' %}
+                                    จำนวนหลอดไฟที่ดับ <input type="number" name="c3_6_defect"
+                                        class="sheet-inline-input input-short" placeholder="0"> ดวง / Target
+                                    ซ่อมแล้วเสร็จ <input type="date" name="c3_6_target"
+                                        class="sheet-inline-input input-date">
+                                    {% elif item.id == 'c4_1' %}
+                                    วัสดุที่ยังไม่อัปเดต <input type="number" name="c4_1_defect"
+                                        class="sheet-inline-input input-short" placeholder="0"> ชิ้น / Target
+                                    อัปเดตเรียบร้อย <input type="date" name="c4_1_target"
+                                        class="sheet-inline-input input-date">
+                                    {% elif item.id == 'c4_2' %}
+                                    วัสดุที่รอติดตั้ง <input type="number" name="c4_2_defect"
+                                        class="sheet-inline-input input-short" placeholder="0"> ชิ้น / Target
+                                    ติดตั้งแล้วเสร็จ <input type="date" name="c4_2_target"
+                                        class="sheet-inline-input input-date">
+                                    {% elif item.id == 'c4_3' %}
+                                    ป้ายลาเบลวัสดุที่ยังไม่อัปเดต <input type="number" name="c4_3_defect"
+                                        class="sheet-inline-input input-short" placeholder="0"> ชิ้น / Target
+                                    ติดป้ายแล้วเสร็จ <input type="date" name="c4_3_target"
+                                        class="sheet-inline-input input-date">
+                                    {% elif item.id == 'c4_4' %}
+                                    จำนวนหลอดไฟที่ดับ <input type="number" name="c4_4_defect"
+                                        class="sheet-inline-input input-short" placeholder="0"> ดวง / Target
+                                    แก้ไขแล้วเสร็จ <input type="date" name="c4_4_target"
+                                        class="sheet-inline-input input-date">
+                                    {% elif item.id == 'c5_1' %}
+                                    วันที่เอกสารเวียน Cal Sheet <input type="date" name="c5_1_date"
+                                        class="sheet-inline-input input-date">
+                                    {% elif item.id == 'c5_2' %}
+                                    วันที่เอกสารเวียนราคาโปรโมชั่น (วันที่เริ่มใช้-วันสิ้นสุดโปรโมชั่น) <input
+                                        type="text" name="c5_2_date" class="sheet-inline-input input-wide"
+                                        placeholder="เช่น 01/08/2026 - 31/08/2026">
+                                    {% elif item.id == 'c5_3' %}
+                                    วันที่เอกสารเวียน Price list <input type="date" name="c5_3_date"
+                                        class="sheet-inline-input input-date">
+                                    {% elif item.id == 'c5_4' %}
+                                    เอกสารที่ยังไม่อัปเดต (ถ้ามี) <input type="text" name="c5_4_defect"
+                                        class="sheet-inline-input input-full" placeholder="ระบุรายการเอกสาร...">
+                                    {% else %}
+                                    {% for field in item.evidence_fields %}
+                                    {{ field.label }} <input type="{{ field.type }}" name="{{ field.name }}"
+                                        class="sheet-inline-input"> &nbsp;
+                                    {% endfor %}
+                                    {% endif %}
+                                </div>
+                                <div class="evidence-passed-overlay" id="overlay_{{ item.id }}">
+                                    <span>(ผ่านเกณฑ์มาตรฐาน)</span>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- BOTTOM SPECIAL NOTE -->
+            <div class="sheet-bottom-note-box" style="text-align: left;">
+                <div class="bottom-note-label" style="text-align: left;">
+                    <strong>หมายเหตุ : กรณีห้องวัสดุไม่ครบ/ไม่เรียบร้อย (หมวดที่ 4.) โปรดอธิบาย</strong>
+                </div>
+                <div class="bottom-note-textarea-wrap" style="text-align: left;">
+                    <textarea name="material_room_note" id="sheetMaterialNote" rows="3" class="sheet-textarea-dotted"
+                        placeholder="พิมพ์คำอธิบายกรณีห้องวัสดุไม่ครบหรือไม่เรียบร้อยที่นี่..." style="text-align: left;"></textarea>
+                </div>
+                <div class="sheet-rev-code-right">
+                    <span>FM-MS-007 Rev.00</span>
+                </div>
+            </div>
+
+            <!-- ================= SECTION: แผนงานประจำวัน (อัตรากำลังพล, Morning Brief & ลายเซ็น) ================= -->
+            <div class="sheet-table-wrapper" style="margin-top: 24px;">
+                <table class="daily-sheet-table">
+                    <thead>
+                        <tr class="daily-sec-title-row">
+                            <th colspan="4" class="daily-sec-title-cell">
+                                แผนงานประจำวัน
+                                <span class="sec-title-sub">อัตรากำลังพล</span>
+                            </th>
+                        </tr>
+                        <tr class="daily-col-head-row">
+                            <th style="width: 28%; text-align: center;">อัตรากำลังพล</th>
+                            <th style="width: 10%; text-align: center;">จำนวน</th>
+                            <th style="width: 22%; text-align: center;">ชื่อย่อพนักงาน</th>
+                            <th style="width: 40%; text-align: center;">Morning Brief &nbsp;(รายละเอียด)</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <!-- Row 1: จำนวนพนักงานทั้งหมด & Morning Brief dynamic table -->
+                        <tr class="daily-headcount-row-1">
+                            <td class="daily-label-cell">จำนวนพนักงานทั้งหมด</td>
+                            <td class="daily-qty-cell">
+                                <input type="number" name="staff_total_qty" class="daily-cell-input input-qty"
+                                    placeholder="0" min="0">
+                            </td>
+                            <td class="daily-names-cell">
+                                <input type="text" name="staff_total_names" class="daily-cell-input"
+                                    placeholder="ระบุชื่อย่อ เช่น KIY,ABC">
+                            </td>
+                            <td rowspan="7" class="daily-textarea-cell" id="mbDesktopCell"
+                                style="vertical-align: top; background: #FFFFFF; padding: 0;">
+                                <div class="mb-container" id="mainMbContainer">
+                                    <div class="mb-mobile-title">Morning Brief &nbsp;(รายละเอียด)</div>
+                                    <table class="mb-table" id="morningBriefTable">
+                                        <tbody id="morningBriefBody">
+                                            <!-- Dynamic Rows inserted here by JS -->
+                                        </tbody>
+                                    </table>
+                                    <div class="mb-actions-bar"
+                                        style="padding: 8px 10px; background: #F8FAFC; border-top: 1px dashed #CBD5E1; display: flex; justify-content: flex-start; align-items: center;">
+                                        <button type="button" class="btn-add-mb-row" onclick="addMorningBriefRow()">
+                                            <i data-lucide="plus" style="width: 15px; height: 15px;"></i> เพิ่มชื่อย่อ
+                                        </button>
+                                    </div>
+                                    <textarea name="morning_brief" id="morningBriefHidden"
+                                        style="display: none;"></textarea>
+                                </div>
+                            </td>
+                        </tr>
+
+                        <!-- Row 2: ทำงานนอกสถานที่ -->
+                        <tr class="daily-headcount-row-2">
+                            <td class="daily-label-cell">ทำงานนอกสถานที่</td>
+                            <td class="daily-qty-cell">
+                                <input type="number" name="staff_offsite_qty" class="daily-cell-input input-qty"
+                                    placeholder="0" min="0">
+                            </td>
+                            <td class="daily-names-cell">
+                                <input type="text" name="staff_offsite_names" class="daily-cell-input"
+                                    placeholder="ระบุชื่อย่อ เช่น KIY,ABC">
+                            </td>
+                        </tr>
+
+                        <!-- Row 3: ออกบูท -->
+                        <tr class="daily-headcount-row-3">
+                            <td class="daily-label-cell">ออกบูท</td>
+                            <td class="daily-qty-cell">
+                                <input type="number" name="staff_booth_qty" class="daily-cell-input input-qty"
+                                    placeholder="0" min="0">
+                            </td>
+                            <td class="daily-names-cell">
+                                <input type="text" name="staff_booth_names" class="daily-cell-input"
+                                    placeholder="ระบุชื่อย่อ เช่น KIY,ABC">
+                            </td>
+                        </tr>
+
+                        <!-- Row 4: ลากิจ -->
+                        <tr class="daily-headcount-row-4">
+                            <td class="daily-label-cell">ลากิจ</td>
+                            <td class="daily-qty-cell">
+                                <input type="number" name="staff_personal_leave_qty" class="daily-cell-input input-qty"
+                                    placeholder="0" min="0">
+                            </td>
+                            <td class="daily-names-cell">
+                                <input type="text" name="staff_personal_leave_names" class="daily-cell-input"
+                                    placeholder="ระบุชื่อย่อ เช่น KIY,ABC">
+                            </td>
+                        </tr>
+
+                        <!-- Row 5: ลาป่วย -->
+                        <tr class="daily-headcount-row-5">
+                            <td class="daily-label-cell">ลาป่วย</td>
+                            <td class="daily-qty-cell">
+                                <input type="number" name="staff_sick_leave_qty" class="daily-cell-input input-qty"
+                                    placeholder="0" min="0">
+                            </td>
+                            <td class="daily-names-cell">
+                                <input type="text" name="staff_sick_leave_names" class="daily-cell-input"
+                                    placeholder="ระบุชื่อย่อ เช่น KIY,ABC">
+                            </td>
+                        </tr>
+
+                        <!-- Row 6: ลาพักร้อน -->
+                        <tr class="daily-headcount-row-6">
+                            <td class="daily-label-cell">ลาพักร้อน</td>
+                            <td class="daily-qty-cell">
+                                <input type="number" name="staff_vacation_leave_qty" class="daily-cell-input input-qty"
+                                    placeholder="0" min="0">
+                            </td>
+                            <td class="daily-names-cell">
+                                <input type="text" name="staff_vacation_leave_names" class="daily-cell-input"
+                                    placeholder="ระบุชื่อย่อ เช่น KIY,ABC">
+                            </td>
+                        </tr>
+
+                        <!-- Row 7: สลับหยุด -->
+                        <tr class="daily-headcount-row-7">
+                            <td class="daily-label-cell">สลับหยุด</td>
+                            <td class="daily-qty-cell">
+                                <input type="number" name="staff_dayoff_qty" class="daily-cell-input input-qty"
+                                    placeholder="0" min="0">
+                            </td>
+                            <td class="daily-names-cell">
+                                <input type="text" name="staff_dayoff_names" class="daily-cell-input"
+                                    placeholder="ระบุชื่อย่อ เช่น KIY,ABC">
+                            </td>
+                        </tr>
+
+                        <!-- Mobile Morning Brief Row (Placed after all 7 headcount cards) -->
+                        <tr class="daily-mb-mobile-row" id="mbMobileRow" style="display: none;">
+                            <td colspan="4" class="daily-mb-mobile-cell" id="mbMobileCell"></td>
+                        </tr>
+
+                        <!-- Signatures Header -->
+                        <tr class="daily-sign-head-row">
+                            <td colspan="3" class="daily-sign-col-left"><strong>พนักงานเซ็นรับทราบ</strong></td>
+                            <td class="daily-sign-col-right"><strong>ผู้จัดการสำนักงานขาย</strong></td>
+                        </tr>
+
+                        <!-- Signatures Body -->
+                        <tr class="daily-signatures-row">
+                            <td colspan="3" class="daily-sign-body-left">
+                                <div class="mobile-sign-section-header">
+                                    <strong>พนักงานเซ็นรับทราบ</strong>
+                                </div>
+                                <div class="sign-staff-row-form">
+                                    <span class="staff-idx">1)</span>
+                                    <div class="sig-slot-container" id="slot_staffManagerSigMB">
+                                        <input type="hidden" name="staff_manager_sig" id="staffManagerSigMB" value="">
+                                        <button type="button" class="btn-trigger-sig-popup" onclick="openSignatureModal('staffManagerSigMB', 'ลายเซ็น: ผู้จัดการสำนักงานขาย', 'slot_staffManagerSigMB')">
+                                            <i data-lucide="pen-tool"></i> <span>กดเพื่อเซ็นลายเซ็น</span>
+                                        </button>
+                                        <div class="sig-signed-preview" style="display: none;">
+                                            <img src="" alt="ลายเซ็น" class="sig-thumb-img">
+                                            <div class="sig-thumb-actions">
+                                                <button type="button" class="btn-sig-thumb-edit" onclick="openSignatureModal('staffManagerSigMB', 'ลายเซ็น: ผู้จัดการสำนักงานขาย', 'slot_staffManagerSigMB')" title="เซ็นใหม่">
+                                                    <i data-lucide="edit-3"></i>
+                                                </button>
+                                                <button type="button" class="btn-sig-thumb-remove" onclick="removeSlotSignature('staffManagerSigMB', 'slot_staffManagerSigMB')" title="ลบลายเซ็น">
+                                                    <i data-lucide="trash-2"></i>
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <input type="text" name="staff_manager" class="sheet-inline-input sign-input"
+                                        placeholder="ชื่อ-นามสกุล...">
+                                    <span class="staff-pos-label">ผู้จัดการสำนักงานขาย</span>
+                                </div>
+                                <div class="sign-staff-row-form">
+                                    <span class="staff-idx">2)</span>
+                                    <div class="sig-slot-container" id="slot_staffSeniorSaleSigMB">
+                                        <input type="hidden" name="staff_senior_sale_sig" id="staffSeniorSaleSigMB" value="">
+                                        <button type="button" class="btn-trigger-sig-popup" onclick="openSignatureModal('staffSeniorSaleSigMB', 'ลายเซ็น: เจ้าหน้าที่ขายอาวุโส', 'slot_staffSeniorSaleSigMB')">
+                                            <i data-lucide="pen-tool"></i> <span>กดเพื่อเซ็นลายเซ็น</span>
+                                        </button>
+                                        <div class="sig-signed-preview" style="display: none;">
+                                            <img src="" alt="ลายเซ็น" class="sig-thumb-img">
+                                            <div class="sig-thumb-actions">
+                                                <button type="button" class="btn-sig-thumb-edit" onclick="openSignatureModal('staffSeniorSaleSigMB', 'ลายเซ็น: เจ้าหน้าที่ขายอาวุโส', 'slot_staffSeniorSaleSigMB')" title="เซ็นใหม่">
+                                                    <i data-lucide="edit-3"></i>
+                                                </button>
+                                                <button type="button" class="btn-sig-thumb-remove" onclick="removeSlotSignature('staffSeniorSaleSigMB', 'slot_staffSeniorSaleSigMB')" title="ลบลายเซ็น">
+                                                    <i data-lucide="trash-2"></i>
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <input type="text" name="staff_senior_sale" class="sheet-inline-input sign-input"
+                                        placeholder="ชื่อ-นามสกุล...">
+                                    <span class="staff-pos-label">เจ้าหน้าที่ขายอาวุโส</span>
+                                </div>
+                                <div class="sign-staff-row-form">
+                                    <span class="staff-idx">3)</span>
+                                    <div class="sig-slot-container" id="slot_staffCoordinatorSigMB">
+                                        <input type="hidden" name="staff_coordinator_sig" id="staffCoordinatorSigMB" value="">
+                                        <button type="button" class="btn-trigger-sig-popup" onclick="openSignatureModal('staffCoordinatorSigMB', 'ลายเซ็น: เจ้าหน้าที่ประสานงานขายและการตลาด', 'slot_staffCoordinatorSigMB')">
+                                            <i data-lucide="pen-tool"></i> <span>กดเพื่อเซ็นลายเซ็น</span>
+                                        </button>
+                                        <div class="sig-signed-preview" style="display: none;">
+                                            <img src="" alt="ลายเซ็น" class="sig-thumb-img">
+                                            <div class="sig-thumb-actions">
+                                                <button type="button" class="btn-sig-thumb-edit" onclick="openSignatureModal('staffCoordinatorSigMB', 'ลายเซ็น: เจ้าหน้าที่ประสานงานขายและการตลาด', 'slot_staffCoordinatorSigMB')" title="เซ็นใหม่">
+                                                    <i data-lucide="edit-3"></i>
+                                                </button>
+                                                <button type="button" class="btn-sig-thumb-remove" onclick="removeSlotSignature('staffCoordinatorSigMB', 'slot_staffCoordinatorSigMB')" title="ลบลายเซ็น">
+                                                    <i data-lucide="trash-2"></i>
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <input type="text" name="staff_coordinator" class="sheet-inline-input sign-input"
+                                        placeholder="ชื่อ-นามสกุล...">
+                                    <span class="staff-pos-label">เจ้าหน้าที่ประสานงานขายและการตลาด</span>
+                                </div>
+                                <div class="sign-staff-row-form">
+                                    <span class="staff-idx">4)</span>
+                                    <div class="sig-slot-container" id="slot_staffArchitectSigMB">
+                                        <input type="hidden" name="staff_architect_sig" id="staffArchitectSigMB" value="">
+                                        <button type="button" class="btn-trigger-sig-popup" onclick="openSignatureModal('staffArchitectSigMB', 'ลายเซ็น: สถาปนิกปรับแบบ', 'slot_staffArchitectSigMB')">
+                                            <i data-lucide="pen-tool"></i> <span>กดเพื่อเซ็นลายเซ็น</span>
+                                        </button>
+                                        <div class="sig-signed-preview" style="display: none;">
+                                            <img src="" alt="ลายเซ็น" class="sig-thumb-img">
+                                            <div class="sig-thumb-actions">
+                                                <button type="button" class="btn-sig-thumb-edit" onclick="openSignatureModal('staffArchitectSigMB', 'ลายเซ็น: สถาปนิกปรับแบบ', 'slot_staffArchitectSigMB')" title="เซ็นใหม่">
+                                                    <i data-lucide="edit-3"></i>
+                                                </button>
+                                                <button type="button" class="btn-sig-thumb-remove" onclick="removeSlotSignature('staffArchitectSigMB', 'slot_staffArchitectSigMB')" title="ลบลายเซ็น">
+                                                    <i data-lucide="trash-2"></i>
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <input type="text" name="staff_architect" class="sheet-inline-input sign-input"
+                                        placeholder="ชื่อ-นามสกุล...">
+                                    <span class="staff-pos-label">สถาปนิกปรับแบบ</span>
+                                </div>
+                            </td>
+                            <td class="daily-sign-body-right">
+                                <div class="mobile-sign-section-header">
+                                    <strong>ผู้จัดการสำนักงานขาย</strong>
+                                </div>
+                                <div class="sign-box-center">
+                                    <div class="sig-slot-container sig-slot-manager" id="slot_managerSigInput_MB">
+                                        <input type="hidden" name="manager_sig_s1" id="managerSigInput_MB" value="">
+                                        <button type="button" class="btn-trigger-sig-popup btn-manager-sig" onclick="openSignatureModal('managerSigInput_MB', 'ลายเซ็น: ผู้จัดการสำนักงานขาย', 'slot_managerSigInput_MB')">
+                                            <i data-lucide="pen-tool"></i> <span>กดเพื่อเซ็นลายเซ็น</span>
+                                        </button>
+                                        <div class="sig-signed-preview" style="display: none;">
+                                            <img src="" alt="ลายเซ็น" class="sig-thumb-img sig-thumb-manager">
+                                            <div class="sig-thumb-actions">
+                                                <button type="button" class="btn-sig-thumb-edit" onclick="openSignatureModal('managerSigInput_MB', 'ลายเซ็น: ผู้จัดการสำนักงานขาย', 'slot_managerSigInput_MB')" title="เซ็นใหม่">
+                                                    <i data-lucide="edit-3"></i>
+                                                </button>
+                                                <button type="button" class="btn-sig-thumb-remove" onclick="removeSlotSignature('managerSigInput_MB', 'slot_managerSigInput_MB')" title="ลบลายเซ็น">
+                                                    <i data-lucide="trash-2"></i>
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="sign-bracket-line" style="margin-top: 8px;">
+                                        (&nbsp; <input type="text" name="manager_name_s1"
+                                            class="sheet-inline-input sign-input-center" placeholder="ชื่อ-นามสกุล...">
+                                        &nbsp;)
+                                    </div>
+                                </div>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- ================= REPORT PHOTO ATTACHMENT SECTION (MANDATORY CAMERA ONLY) ================= -->
+            <div class="report-camera-section-card" id="reportPhotoSection" style="margin-top: 24px;">
+                <div class="camera-card-header">
+                    <div class="camera-card-title">
+                        <div class="camera-title-icon-box">
+                            <i data-lucide="camera" class="camera-icon"></i>
+                        </div>
+                        <div>
+                            <div class="camera-card-heading">ถ่ายรูปการตรวจ Morning Audit</div>
+                            <div class="camera-card-subheading">กรุณาใช้กล้องถ่ายภาพอย่างน้อย 7 รูป (<strong>รูปที่ 1:</strong> ภาพถ่ายพนักงานเต็มตัว <strong>รูปที่ 2-7:</strong> ภาพตรวจพื้นที่จุดต่างๆ)</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="camera-card-body">
+                    <!-- Camera Control Actions -->
+                    <div class="camera-action-controls">
+                        <button type="button" class="btn-camera-trigger" id="btnOpenLiveCamera">
+                            <i data-lucide="camera"></i> ถ่ายรูปรายงานจากกล้อง
+                        </button>
+                        <div class="desktop-camera-notice">
+                            <i data-lucide="smartphone"></i>
+                            <span>กรุณาใช้มือถือในการถ่ายรูปรายงาน (ปุ่มถ่ายภาพจะแสดงบนมือถือและแท็บเล็ต)</span>
+                        </div>
+                        <!-- HTML5 Native Mobile Camera (Directly opens camera on phone) -->
+                        <input type="file" id="nativeCameraInput" accept="image/*" capture="environment" style="display: none;">
+                    </div>
+
+                    <!-- Photo Thumbnails List -->
+                    <div class="snapped-photos-grid" id="snappedPhotosGrid">
+                        <!-- Empty placeholder state -->
+                        <div class="empty-photo-placeholder" id="emptyPhotoPlaceholder">
+                            <i data-lucide="camera-off" class="placeholder-icon"></i>
+                            <span>ยังไม่มีรูปถ่ายรายงาน (กรุณากดปุ่ม <strong>"ถ่ายรูปรายงานจากกล้อง"</strong> อย่างน้อย
+                                7 รูป)</span>
+                        </div>
+                    </div>
+
+                    <!-- Hidden field storing array of Base64 / server paths -->
+                    <input type="hidden" name="audit_photos_json" id="auditPhotosJsonInput" value="[]">
+                    <input type="hidden" name="report_photos_json" id="reportPhotosJsonInput" value="[]">
+                </div>
+            </div>
+
+            <!-- SUBMIT ACTION BAR -->
+            <div class="sheet-submit-action-bar">
+                <div class="submit-stats-quick">
+                    <span>สถานะการประเมิน: </span>
+                    <span class="badge-quick-stat stat-green">ผ่าน <strong id="quickPassCount">0</strong> ข้อ</span>
+                    <span class="badge-quick-stat stat-red">ไม่ผ่าน <strong id="quickFailCount">0</strong> ข้อ</span>
+                </div>
+                <div class="submit-btns-right">
+                    <a href="{{ url_for('dashboard') }}" class="btn-sheet-cancel">ยกเลิก</a>
+                    <button type="submit" class="btn-sheet-submit" id="sheetSubmitBtn">
+                        <i data-lucide="save"></i> บันทึกผลการตรวจ Morning Audit
+                    </button>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- ================= SIGNATURE DRAWING MODAL ================= -->
+<div class="sig-modal-overlay" id="sigModalOverlay" style="display: none;">
+    <div class="sig-modal-dialog">
+        <div class="sig-modal-header">
+            <div class="sig-modal-title">
+                <i data-lucide="pen-tool"></i> <span id="sigModalTitle">เซ็นลายเซ็น</span>
+            </div>
+            <button type="button" class="btn-close-sig-modal" onclick="closeSignatureModal()" title="ปิด">
+                <i data-lucide="x"></i>
+            </button>
+        </div>
+        <div class="sig-modal-body">
+            <div class="sig-modal-canvas-wrapper">
+                <canvas id="sigModalCanvas" class="sig-modal-canvas" width="500" height="220"></canvas>
+                <div class="sig-modal-guide-line">
+                    <span>เซ็นลายเซ็นตรงนี้</span>
+                </div>
+            </div>
+            <div class="sig-modal-hint">
+                <i data-lucide="info" style="width: 14px; height: 14px;"></i>
+                <span>ใช้นิ้วมือ ปากกาสไตลัส หรือเมาส์เพื่อเซ็นชื่อ</span>
+            </div>
+        </div>
+        <div class="sig-modal-footer">
+            <button type="button" class="btn-sig-modal-clear" onclick="clearModalSignature()">
+                <i data-lucide="rotate-ccw"></i> ล้างลายเซ็น
+            </button>
+            <div class="sig-modal-footer-right">
+                <button type="button" class="btn-sig-modal-cancel" onclick="closeSignatureModal()">
+                    ยกเลิก
+                </button>
+                <button type="button" class="btn-sig-modal-save" onclick="saveModalSignature()">
+                    <i data-lucide="check"></i> บันทึกลายเซ็น
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ================= LIVE CAMERA MODAL ================= -->
+<div class="camera-modal-overlay" id="cameraModalOverlay" style="display: none;">
+    <div class="camera-modal-dialog">
+        <div class="camera-modal-header">
+            <div class="camera-modal-title">
+                <i data-lucide="camera"></i> กล้องถ่ายรูปรายงาน
+            </div>
+            <button type="button" class="btn-close-camera" id="btnCloseCameraModal" title="ปิดกล้อง">
+                <i data-lucide="x"></i>
+            </button>
+        </div>
+        <div class="camera-viewfinder-container">
+            <video id="cameraVideo" autoplay playsinline muted></video>
+            <canvas id="cameraCanvas" style="display: none;"></canvas>
+            <div class="camera-guide-frame">
+                <div class="guide-corner top-left"></div>
+                <div class="guide-corner top-right"></div>
+                <div class="guide-corner bottom-left"></div>
+                <div class="guide-corner bottom-right"></div>
+                <span class="guide-text">จัดเอกสารให้อยู่ในกรอบ</span>
+            </div>
+            <div class="camera-flash-effect" id="cameraFlashEffect"></div>
+        </div>
+        <div class="camera-modal-controls">
+            <button type="button" class="btn-camera-switch" id="btnSwitchCamera" title="สลับกล้องหน้า/หลัง">
+                <i data-lucide="refresh-cw"></i>
+            </button>
+            <button type="button" class="btn-camera-snap" id="btnSnapPhoto" title="กดถ่ายรูป">
+                <div class="snap-inner-circle"></div>
+            </button>
+            <button type="button" class="btn-camera-done" id="btnDoneCamera">
+                <i data-lucide="check"></i> เสร็จสิ้น
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- ================= IN-WEBSITE IMAGE LIGHTBOX MODAL ================= -->
+<div class="inpage-lightbox-overlay" id="inpageLightboxModal" style="display: none;">
+    <div class="lightbox-top-toolbar">
+        <div class="lightbox-title-info">
+            <i data-lucide="image"></i> <span id="lightboxPhotoTitle">รูปถ่ายรายงาน</span>
+            <span class="lightbox-counter-badge" id="lightboxCounterBadge">1 / 1</span>
+        </div>
+        <div class="lightbox-actions-right">
+            <button type="button" class="lightbox-btn-action" id="lightboxZoomIn" title="ซูมเข้า">
+                <i data-lucide="zoom-in"></i>
+            </button>
+            <button type="button" class="lightbox-btn-action" id="lightboxZoomOut" title="ซูมออก">
+                <i data-lucide="zoom-out"></i>
+            </button>
+            <button type="button" class="lightbox-btn-action" id="lightboxResetZoom" title="รีเซ็ตขนาด">
+                <i data-lucide="maximize-2"></i>
+            </button>
+            <button type="button" class="lightbox-btn-close" id="lightboxCloseBtn" title="ปิดหน้าต่าง">
+                <i data-lucide="x"></i>
+            </button>
+        </div>
+    </div>
+    <div class="lightbox-body">
+        <button type="button" class="lightbox-nav-btn prev" id="lightboxPrevBtn" title="รูปก่อนหน้า">
+            <i data-lucide="chevron-left"></i>
+        </button>
+        <div class="lightbox-image-wrapper" id="lightboxImageWrapper">
+            <img src="" alt="รูปถ่ายรายงาน" id="lightboxImage" class="lightbox-main-img">
+        </div>
+        <button type="button" class="lightbox-nav-btn next" id="lightboxNextBtn" title="รูปถัดไป">
+            <i data-lucide="chevron-right"></i>
+        </button>
+    </div>
+</div>
+
+<!-- ================= NO CAMERA WARNING MODAL (FOR PC WITHOUT WEBCAM) ================= -->
+<div class="no-camera-modal-overlay" id="noCameraModalOverlay" style="display: none;">
+    <div class="no-camera-modal-dialog">
+        <div class="no-camera-icon-wrapper">
+            <div class="no-camera-icon-circle">
+                <i data-lucide="smartphone" class="no-camera-icon"></i>
+            </div>
+            <div class="no-camera-sub-badge">
+                <i data-lucide="camera-off"></i>
+            </div>
+        </div>
+        <h3 class="no-camera-title" style="margin-bottom: 24px;">กรุณาใช้มือถือในการถ่ายภาพ</h3>
+        <div class="no-camera-actions">
+            <button type="button" class="btn-close-no-camera" id="btnCloseNoCameraModal">
+                <i data-lucide="check"></i> รับทราบ
+            </button>
+        </div>
+    </div>
+</div>
+
+<script>
+    const totalItems = {{ total_items }};
+    const IS_ADMIN = {{ 'true' if current_user.role == 'ADMIN' else 'false' }};
+
+    function checkAuditExists() {
+        if (IS_ADMIN) return;
+        const branchSelect = document.getElementById('branchMainInput');
+        const dateInput = document.getElementById('dateMainInput');
+        const branch = branchSelect ? branchSelect.value.trim() : '';
+        const date = dateInput ? dateInput.value.trim() : '';
+
+        const banner = document.getElementById('morningAuditLockedBanner');
+        const submitBtn = document.getElementById('sheetSubmitBtn');
+
+        if (!branch || !date) {
+            if (banner) banner.style.display = 'none';
+            if (submitBtn) {
+                submitBtn.disabled = false;
+                submitBtn.style.opacity = '1';
+                submitBtn.style.cursor = 'pointer';
+                submitBtn.innerHTML = '<i data-lucide="save"></i> บันทึกผลการตรวจ Morning Audit';
+                if (window.lucide) lucide.createIcons();
+            }
+            return;
+        }
+
+        fetch(`/morning-audit/check-exists?branch=${encodeURIComponent(branch)}&date=${encodeURIComponent(date)}`)
+            .then(res => res.json())
+            .then(data => {
+                if (data && data.exists) {
+                    if (banner) {
+                        banner.style.display = 'flex';
+                        const titleEl = document.getElementById('auditLockedTitle');
+                        const linkEl = document.getElementById('auditLockedLink');
+                        if (titleEl) {
+                            titleEl.textContent = `สาขา ${branch} ได้ทำการส่งแบบตรวจ Morning Audit ประจำวันที่ ${date} เรียบร้อยแล้ว`;
+                        }
+                        if (linkEl && data.id) {
+                            linkEl.href = `/morning-audit/${data.id}`;
+                            linkEl.style.display = 'inline-flex';
+                        }
+                    }
+                    if (submitBtn) {
+                        submitBtn.disabled = true;
+                        submitBtn.style.opacity = '0.6';
+                        submitBtn.style.cursor = 'not-allowed';
+                        submitBtn.innerHTML = '<i data-lucide="lock"></i> ส่งผลการตรวจแล้ว';
+                        if (window.lucide) lucide.createIcons();
+                    }
+                } else {
+                    if (banner) banner.style.display = 'none';
+                    if (submitBtn) {
+                        submitBtn.disabled = false;
+                        submitBtn.style.opacity = '1';
+                        submitBtn.style.cursor = 'pointer';
+                        submitBtn.innerHTML = '<i data-lucide="save"></i> บันทึกผลการตรวจ Morning Audit';
+                        if (window.lucide) lucide.createIcons();
+                    }
+                }
+            })
+            .catch(err => console.error('Error checking audit exists:', err));
+    }
+
+    function syncBranchDate() {
+        const branchSelect = document.getElementById('branchMainInput');
+        const dateInput = document.getElementById('dateMainInput');
+
+        const branchDisplay = document.getElementById('syncBranchDisplay');
+        const dateDisplay = document.getElementById('syncDateDisplay');
+
+        const selectedBranch = branchSelect.value.trim();
+        const selectedDate = dateInput.value.trim();
+
+        branchDisplay.textContent = selectedBranch ? selectedBranch : '....................................................';
+
+        if (selectedDate) {
+            // Format to DD/MM/YYYY
+            const parts = selectedDate.split('-');
+            if (parts.length === 3) {
+                dateDisplay.textContent = `${parts[2]}/${parts[1]}/${parts[0]}`;
+            } else {
+                dateDisplay.textContent = selectedDate;
+            }
+        } else {
+            dateDisplay.textContent = '....................................................';
+        }
+
+        checkAuditExists();
+    }
+
+    function selectStatus(itemId, status) {
+        const radio = document.getElementById(`radio_${status.toLowerCase()}_${itemId}`);
+        if (radio) {
+            radio.checked = true;
+            onStatusChange(itemId, status);
+        }
+    }
+
+    function onStatusChange(itemId, status) {
+        const row = document.getElementById(`row_${itemId}`);
+        const evidenceCell = document.getElementById(`evidence_cell_${itemId}`);
+        const evidenceContent = document.getElementById(`evidence_content_${itemId}`);
+        const overlay = document.getElementById(`overlay_${itemId}`);
+        const inputs = evidenceCell.querySelectorAll('input, select, textarea');
+
+        const boxPass = document.getElementById(`box_pass_${itemId}`);
+        const boxFail = document.getElementById(`box_fail_${itemId}`);
+
+        if (status === 'PASS') {
+            row.classList.add('row-passed');
+            row.classList.remove('row-failed');
+            evidenceCell.classList.add('cell-grayed-out');
+
+            if (evidenceContent) evidenceContent.style.display = 'none';
+            if (overlay) overlay.style.display = 'flex';
+
+            boxPass.classList.add('checked');
+            boxFail.classList.remove('checked');
+
+            inputs.forEach(input => {
+                input.disabled = true;
+            });
+        } else {
+            row.classList.remove('row-passed');
+            row.classList.add('row-failed');
+            evidenceCell.classList.remove('cell-grayed-out');
+
+            if (evidenceContent) evidenceContent.style.display = 'block';
+            if (overlay) overlay.style.display = 'none';
+
+            boxPass.classList.remove('checked');
+            boxFail.classList.add('checked');
+
+            inputs.forEach(input => {
+                input.disabled = false;
+            });
+
+            // Focus on first input in evidence cell
+            const firstInput = evidenceCell.querySelector('input');
+            if (firstInput) {
+                firstInput.focus();
+            }
+        }
+
+        updateStats();
+    }
+
+    function setAllSheetStatus(targetStatus) {
+        const radios = document.querySelectorAll(`input[type="radio"][value="${targetStatus}"]`);
+        radios.forEach(radio => {
+            radio.checked = true;
+            const itemId = radio.name.replace('status_', '');
+            onStatusChange(itemId, targetStatus);
+        });
+    }
+
+    function updateStats() {
+        const passChecked = document.querySelectorAll('input[type="radio"][value="PASS"]:checked').length;
+        const failChecked = document.querySelectorAll('input[type="radio"][value="FAIL"]:checked').length;
+
+        document.getElementById('quickPassCount').textContent = passChecked;
+        document.getElementById('quickFailCount').textContent = failChecked;
+    }
+
+    // ================= SIGNATURE MODAL MANAGEMENT =================
+    let currentSigTargetInputId = null;
+    let currentSigTargetSlotId = null;
+    let modalCanvas = null;
+    let modalCtx = null;
+    let modalHasDrawn = false;
+
+    function initSignatureModalCanvas() {
+        modalCanvas = document.getElementById('sigModalCanvas');
+        if (!modalCanvas) return;
+        modalCtx = modalCanvas.getContext('2d');
+        modalCtx.strokeStyle = "#0F172A";
+        modalCtx.lineWidth = 3.0;
+        modalCtx.lineCap = "round";
+        modalCtx.lineJoin = "round";
+
+        let isDrawing = false;
+
+        function getPos(e) {
+            const rect = modalCanvas.getBoundingClientRect();
+            const scaleX = modalCanvas.width / rect.width;
+            const scaleY = modalCanvas.height / rect.height;
+            let clientX, clientY;
+            if (e.touches && e.touches.length > 0) {
+                clientX = e.touches[0].clientX;
+                clientY = e.touches[0].clientY;
+            } else {
+                clientX = e.clientX;
+                clientY = e.clientY;
+            }
+            return {
+                x: (clientX - rect.left) * scaleX,
+                y: (clientY - rect.top) * scaleY
+            };
+        }
+
+        function startDrawing(e) {
+            isDrawing = true;
+            modalHasDrawn = true;
+            const pos = getPos(e);
+            modalCtx.beginPath();
+            modalCtx.moveTo(pos.x, pos.y);
+            if (e.cancelable) e.preventDefault();
+            e.stopPropagation();
+        }
+
+        function draw(e) {
+            if (!isDrawing) return;
+            const pos = getPos(e);
+            modalCtx.lineTo(pos.x, pos.y);
+            modalCtx.stroke();
+            if (e.cancelable) e.preventDefault();
+            e.stopPropagation();
+        }
+
+        function stopDrawing(e) {
+            if (isDrawing) {
+                isDrawing = false;
+                modalCtx.closePath();
+                if (e && e.cancelable) e.preventDefault();
+            }
+        }
+
+        modalCanvas.addEventListener('mousedown', startDrawing);
+        modalCanvas.addEventListener('mousemove', draw);
+        modalCanvas.addEventListener('mouseup', stopDrawing);
+        modalCanvas.addEventListener('mouseleave', stopDrawing);
+
+        modalCanvas.addEventListener('touchstart', startDrawing, { passive: false });
+        modalCanvas.addEventListener('touchmove', draw, { passive: false });
+        modalCanvas.addEventListener('touchend', stopDrawing, { passive: false });
+        modalCanvas.addEventListener('touchcancel', stopDrawing, { passive: false });
+
+        // Prevent background scroll when touching overlay
+        const overlay = document.getElementById('sigModalOverlay');
+        if (overlay) {
+            overlay.addEventListener('touchmove', (e) => {
+                if (e.cancelable) e.preventDefault();
+            }, { passive: false });
+        }
+    }
+
+    let savedSigScrollY = 0;
+
+    function openSignatureModal(targetInputId, titleText = 'เซ็นลายเซ็น', targetSlotId = null) {
+        savedSigScrollY = window.pageYOffset || document.documentElement.scrollTop || document.body.scrollTop || 0;
+        currentSigTargetInputId = targetInputId;
+        currentSigTargetSlotId = targetSlotId;
+
+        const titleElem = document.getElementById('sigModalTitle');
+        if (titleElem) titleElem.textContent = titleText;
+
+        clearModalSignature();
+
+        const overlay = document.getElementById('sigModalOverlay');
+        if (overlay) {
+            overlay.style.display = 'flex';
+            setTimeout(() => {
+                if (!modalCtx) initSignatureModalCanvas();
+            }, 50);
+        }
+    }
+
+    function closeSignatureModal() {
+        const overlay = document.getElementById('sigModalOverlay');
+        if (overlay) overlay.style.display = 'none';
+        currentSigTargetInputId = null;
+        currentSigTargetSlotId = null;
+
+        if (typeof savedSigScrollY === 'number') {
+            window.scrollTo({ top: savedSigScrollY, behavior: 'instant' });
+        }
+    }
+
+    function clearModalSignature() {
+        if (modalCanvas && modalCtx) {
+            modalCtx.clearRect(0, 0, modalCanvas.width, modalCanvas.height);
+            modalHasDrawn = false;
+        }
+    }
+
+    function saveModalSignature() {
+        if (!modalHasDrawn) {
+            if (typeof Swal !== 'undefined') {
+                Swal.fire({
+                    icon: 'warning',
+                    title: 'ยังไม่ได้เซ็นลายเซ็น',
+                    text: 'กรุณาเซ็นชื่อก่อนกดยืนยัน',
+                    confirmButtonText: 'ตกลง',
+                    confirmButtonColor: '#DC2626'
+                });
+            } else {
+                alert('กรุณาเซ็นชื่อก่อนกดยืนยัน');
+            }
+            return;
+        }
+
+        const base64 = modalCanvas.toDataURL('image/png');
+
+        if (currentSigTargetInputId) {
+            const input = document.getElementById(currentSigTargetInputId);
+            if (input) input.value = base64;
+        }
+
+        if (currentSigTargetSlotId) {
+            const slot = document.getElementById(currentSigTargetSlotId);
+            if (slot) {
+                const btnTrigger = slot.querySelector('.btn-trigger-sig-popup');
+                const previewContainer = slot.querySelector('.sig-signed-preview');
+                const img = slot.querySelector('.sig-thumb-img');
+
+                if (btnTrigger) btnTrigger.style.display = 'none';
+                if (previewContainer) previewContainer.style.display = 'flex';
+                if (img) img.src = base64;
+            }
+        }
+
+        closeSignatureModal();
+        if (window.lucide) lucide.createIcons();
+    }
+
+    function removeSlotSignature(inputId, slotId) {
+        const input = document.getElementById(inputId);
+        if (input) input.value = '';
+
+        const slot = document.getElementById(slotId);
+        if (slot) {
+            const btnTrigger = slot.querySelector('.btn-trigger-sig-popup');
+            const previewContainer = slot.querySelector('.sig-signed-preview');
+            const img = slot.querySelector('.sig-thumb-img');
+
+            if (btnTrigger) btnTrigger.style.display = 'inline-flex';
+            if (previewContainer) previewContainer.style.display = 'none';
+            if (img) img.src = '';
+        }
+        if (window.lucide) lucide.createIcons();
+    }
+
+    function autoResizeTextarea(textarea) {
+        if (!textarea) return;
+        textarea.style.height = 'auto';
+        textarea.style.height = Math.max(32, textarea.scrollHeight) + 'px';
+    }
+
+    function escapeHtml(str) {
+        if (!str) return '';
+        return String(str)
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;")
+            .replace(/'/g, "&#039;");
+    }
+
+    function addMorningBriefRow(initial = '', detail = '') {
+        const tbody = document.getElementById('morningBriefBody');
+        if (!tbody) return;
+
+        const row = document.createElement('tr');
+        row.className = 'mb-row';
+        row.innerHTML = `
+            <td style="width: 96px; min-width: 96px; max-width: 105px; vertical-align: top;">
+                <input type="text" name="mb_staff_initial[]" class="mb-staff-input" value="${escapeHtml(initial)}" maxlength="3" placeholder="ระบุชื่อย่อ : " oninput="this.value = this.value.toUpperCase().replace(/[^A-Z]/g, '').slice(0, 3); compileMorningBrief();">
+            </td>
+            <td style="vertical-align: top;">
+                <textarea name="mb_detail[]" class="mb-detail-input" placeholder="รายละเอียด Morning Brief : " rows="1" oninput="autoResizeTextarea(this); compileMorningBrief();">${escapeHtml(detail)}</textarea>
+            </td>
+            <td style="width: 32px; min-width: 32px; max-width: 32px; text-align: center; vertical-align: top; padding-top: 6px;">
+                <button type="button" class="btn-remove-mb-row" onclick="removeMorningBriefRow(this)" title="ลบบรรทัด">
+                    <i data-lucide="trash-2" style="width: 14px; height: 14px;"></i>
+                </button>
+            </td>
+        `;
+        tbody.appendChild(row);
+
+        const textarea = row.querySelector('textarea');
+        if (textarea) {
+            autoResizeTextarea(textarea);
+        }
+
+        if (window.lucide) {
+            lucide.createIcons();
+        }
+    }
+
+    function removeMorningBriefRow(btn) {
+        const row = btn.closest('tr');
+        if (row) {
+            row.remove();
+            compileMorningBrief();
+        }
+    }
+
+    function compileMorningBrief() {
+        const initials = document.querySelectorAll('input[name="mb_staff_initial[]"]');
+        const details = document.querySelectorAll('textarea[name="mb_detail[]"], input[name="mb_detail[]"]');
+        const lines = [];
+
+        for (let i = 0; i < initials.length; i++) {
+            const initVal = initials[i].value.trim().toUpperCase();
+            const detailVal = details[i].value.trim();
+            if (initVal || detailVal) {
+                if (initVal && detailVal) {
+                    lines.push(`${initVal}: ${detailVal}`);
+                } else if (initVal) {
+                    lines.push(`${initVal}:`);
+                } else {
+                    lines.push(detailVal);
+                }
+            }
+        }
+
+        const hiddenInput = document.getElementById('morningBriefHidden');
+        if (hiddenInput) {
+            hiddenInput.value = lines.join('\n');
+        }
+    }
+
+    // ================= CAMERA CAPTURE & PHOTO MANAGEMENT =================
+    let snappedPhotos = [];           // base64 for local thumbnail display
+    let uploadedPhotoPaths = [];      // server file paths from AJAX upload
+
+    async function uploadPhotoToServer(base64Data) {
+        try {
+            const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || 
+                              document.querySelector('input[name="csrf_token"]')?.value || '';
+            const resp = await fetch('/morning-audit/upload-photo', {
+                method: 'POST',
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'X-CSRF-Token': csrfToken
+                },
+                body: JSON.stringify({ 
+                    photo: base64Data,
+                    csrf_token: csrfToken
+                })
+            });
+            if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+            const result = await resp.json();
+            if (result.success && result.path) {
+                return result.path;
+            }
+            throw new Error(result.error || 'Upload failed');
+        } catch (err) {
+            console.error('Photo upload error:', err);
+            return null;
+        }
+    }
+    let cameraStream = null;
+    let currentFacingMode = 'environment';
+
+    // Lightbox State
+    let lightboxCurrentIndex = 0;
+    let lightboxZoomScale = 1.0;
+
+    const btnOpenLiveCamera = document.getElementById('btnOpenLiveCamera');
+    const nativeCameraInput = document.getElementById('nativeCameraInput');
+    const cameraModalOverlay = document.getElementById('cameraModalOverlay');
+    const btnCloseCameraModal = document.getElementById('btnCloseCameraModal');
+    const btnSwitchCamera = document.getElementById('btnSwitchCamera');
+    const btnSnapPhoto = document.getElementById('btnSnapPhoto');
+    const btnDoneCamera = document.getElementById('btnDoneCamera');
+    const cameraVideo = document.getElementById('cameraVideo');
+    const cameraCanvas = document.getElementById('cameraCanvas');
+    const cameraFlashEffect = document.getElementById('cameraFlashEffect');
+    const snappedPhotosGrid = document.getElementById('snappedPhotosGrid');
+    const reportPhotosJsonInput = document.getElementById('reportPhotosJsonInput');
+    const auditPhotosJsonInput = document.getElementById('auditPhotosJsonInput');
+
+    function syncPhotoInputs() {
+        const jsonStr = JSON.stringify(uploadedPhotoPaths.slice(0, 7));
+        if (reportPhotosJsonInput) {
+            reportPhotosJsonInput.value = jsonStr;
+        }
+        if (auditPhotosJsonInput) {
+            auditPhotosJsonInput.value = jsonStr;
+        }
+    }
+
+    // Lightbox Elements
+    const inpageLightboxModal = document.getElementById('inpageLightboxModal');
+    const lightboxImage = document.getElementById('lightboxImage');
+    const lightboxPhotoTitle = document.getElementById('lightboxPhotoTitle');
+    const lightboxCounterBadge = document.getElementById('lightboxCounterBadge');
+    const lightboxPrevBtn = document.getElementById('lightboxPrevBtn');
+    const lightboxNextBtn = document.getElementById('lightboxNextBtn');
+    const lightboxCloseBtn = document.getElementById('lightboxCloseBtn');
+    const lightboxZoomIn = document.getElementById('lightboxZoomIn');
+    const lightboxZoomOut = document.getElementById('lightboxZoomOut');
+    const lightboxResetZoom = document.getElementById('lightboxResetZoom');
+
+    // No-Camera Warning Elements
+    const noCameraModalOverlay = document.getElementById('noCameraModalOverlay');
+    const btnCloseNoCameraModal = document.getElementById('btnCloseNoCameraModal');
+
+    function getWebGLGPU() {
+        try {
+            const canvas = document.createElement('canvas');
+            const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
+            if (!gl) return '';
+            const ext = gl.getExtension('WEBGL_debug_renderer_info');
+            return ext ? (gl.getParameter(ext.UNMASKED_RENDERER_WEBGL) || '') : '';
+        } catch (e) {
+            return '';
+        }
+    }
+
+    function isDesktopComputer() {
+        // 1. Check GPU Hardware (DevTools Device Mode CANNOT spoof GPU)
+        const gpu = getWebGLGPU();
+        if (/NVIDIA|GeForce|Radeon|AMD|Intel\(R\)|Direct3D|ANGLE \(Intel|ANGLE \(NVIDIA|ANGLE \(AMD|llvmpipe|VMware|Parallels/i.test(gpu)) {
+            return true;
+        }
+
+        // 2. Check Platform & UserAgent
+        const platform = (navigator.userAgentData && navigator.userAgentData.platform) || navigator.platform || '';
+        const ua = navigator.userAgent || '';
+        if (/Win|Mac|Linux x86|X11/i.test(platform) && !/Android/i.test(ua)) {
+            return true;
+        }
+        if (/Windows NT|Macintosh/i.test(ua)) {
+            return true;
+        }
+
+        // 3. Pointer & Hover capabilities (Hardware Mouse)
+        if (window.matchMedia && window.matchMedia('(pointer: fine) and (hover: hover)').matches && !navigator.maxTouchPoints) {
+            return true;
+        }
+
+        return false;
+    }
+
+    function isMobileDevice() {
+        if (isDesktopComputer()) return false;
+        const ua = navigator.userAgent || '';
+        return /Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(ua);
+    }
+
+    function applyDeviceCameraVisibility() {
+        const btn = document.getElementById('btnOpenLiveCamera');
+        const notice = document.querySelector('.desktop-camera-notice');
+        const isDesktop = isDesktopComputer();
+
+        if (isDesktop) {
+            document.body.classList.add('device-desktop');
+            if (btn) btn.style.setProperty('display', 'none', 'important');
+            if (notice) notice.style.setProperty('display', 'inline-flex', 'important');
+        } else {
+            document.body.classList.remove('device-desktop');
+            if (btn) btn.style.setProperty('display', 'inline-flex', 'important');
+            if (notice) notice.style.setProperty('display', 'none', 'important');
+        }
+    }
+
+    // Run device visibility check immediately
+    applyDeviceCameraVisibility();
+    window.addEventListener('resize', applyDeviceCameraVisibility);
+
+    function showNoCameraModal() {
+        if (noCameraModalOverlay) {
+            noCameraModalOverlay.style.display = 'flex';
+        } else {
+            alert("กรุณาใช้มือถือในการถ่ายภาพ");
+        }
+    }
+
+    function closeNoCameraModal() {
+        if (noCameraModalOverlay) {
+            noCameraModalOverlay.style.display = 'none';
+        }
+    }
+
+    if (btnCloseNoCameraModal) {
+        btnCloseNoCameraModal.addEventListener('click', closeNoCameraModal);
+    }
+
+    async function getCameraStream(constraints) {
+        if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+            return await navigator.mediaDevices.getUserMedia(constraints);
+        }
+        const legacyGUM = navigator.getUserMedia ||
+            navigator.webkitGetUserMedia ||
+            navigator.mozGetUserMedia ||
+            navigator.msGetUserMedia;
+        if (legacyGUM) {
+            return new Promise((resolve, reject) => {
+                legacyGUM.call(navigator, constraints, resolve, reject);
+            });
+        }
+        throw new Error("MEDIA_DEVICES_NOT_SUPPORTED");
+    }
+
+    async function startCameraStream() {
+        stopCameraStream();
+
+        const hasMediaSupport = (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) ||
+            navigator.getUserMedia || navigator.webkitGetUserMedia ||
+            navigator.mozGetUserMedia || navigator.msGetUserMedia;
+
+        if (!hasMediaSupport) {
+            if (isMobileDevice() && nativeCameraInput) {
+                nativeCameraInput.click();
+            } else {
+                showNoCameraModal();
+            }
+            return;
+        }
+
+        const constraintOptions = [];
+        if (isMobileDevice()) {
+            constraintOptions.push({
+                video: {
+                    facingMode: { ideal: currentFacingMode },
+                    width: { ideal: 1280 },
+                    height: { ideal: 720 }
+                },
+                audio: false
+            });
+            constraintOptions.push({
+                video: { facingMode: currentFacingMode },
+                audio: false
+            });
+        } else {
+            constraintOptions.push({
+                video: {
+                    width: { ideal: 1280 },
+                    height: { ideal: 720 }
+                },
+                audio: false
+            });
+        }
+        constraintOptions.push({ video: true, audio: false });
+
+        let stream = null;
+        let lastError = null;
+
+        for (const constraints of constraintOptions) {
+            try {
+                stream = await getCameraStream(constraints);
+                if (stream) break;
+            } catch (err) {
+                lastError = err;
+                console.warn("getUserMedia failed with constraints:", constraints, err);
+            }
+        }
+
+        if (stream) {
+            cameraStream = stream;
+            cameraVideo.srcObject = cameraStream;
+            try {
+                await cameraVideo.play();
+            } catch (playErr) {
+                console.warn("video.play error:", playErr);
+            }
+            cameraModalOverlay.style.display = 'flex';
+            updateSnapBtnState();
+            return;
+        }
+
+        console.warn("Live camera stream unavailable on this device:", lastError);
+        stopCameraStream();
+        cameraModalOverlay.style.display = 'none';
+
+        if (isMobileDevice() && nativeCameraInput) {
+            nativeCameraInput.click();
+        } else {
+            showNoCameraModal();
+        }
+    }
+
+    function stopCameraStream() {
+        if (cameraStream) {
+            cameraStream.getTracks().forEach(track => track.stop());
+            cameraStream = null;
+        }
+        if (cameraVideo) {
+            cameraVideo.srcObject = null;
+        }
+    }
+
+    function updateSnapBtnState() {
+        if (!btnSnapPhoto) return;
+        if (snappedPhotos.length >= 7) {
+            btnSnapPhoto.style.opacity = '0.35';
+            btnSnapPhoto.style.cursor = 'not-allowed';
+            btnSnapPhoto.disabled = true;
+        } else {
+            btnSnapPhoto.style.opacity = '1';
+            btnSnapPhoto.style.cursor = 'pointer';
+            btnSnapPhoto.disabled = false;
+        }
+    }
+
+    if (btnOpenLiveCamera) {
+        btnOpenLiveCamera.addEventListener('click', (e) => {
+            if (isDesktopComputer()) {
+                e.preventDefault();
+                showNoCameraModal();
+                return;
+            }
+            if (snappedPhotos.length >= 7) return;
+            startCameraStream();
+            updateSnapBtnState();
+        });
+    }
+
+    if (btnCloseCameraModal) {
+        btnCloseCameraModal.addEventListener('click', () => {
+            stopCameraStream();
+            cameraModalOverlay.style.display = 'none';
+        });
+    }
+
+    if (btnDoneCamera) {
+        btnDoneCamera.addEventListener('click', () => {
+            stopCameraStream();
+            cameraModalOverlay.style.display = 'none';
+        });
+    }
+
+    if (btnSwitchCamera) {
+        btnSwitchCamera.addEventListener('click', () => {
+            currentFacingMode = (currentFacingMode === 'environment') ? 'user' : 'environment';
+            startCameraStream();
+        });
+    }
+
+    function compressImage(dataUrlOrFile, maxWidth = 1280, maxHeight = 1280, quality = 0.80) {
+        return new Promise((resolve) => {
+            const img = new Image();
+            img.onload = () => {
+                let width = img.width;
+                let height = img.height;
+
+                if (width > maxWidth || height > maxHeight) {
+                    if (width / height > maxWidth / maxHeight) {
+                        height = Math.round((height * maxWidth) / width);
+                        width = maxWidth;
+                    } else {
+                        width = Math.round((width * maxHeight) / height);
+                        height = maxHeight;
+                    }
+                }
+
+                const canvas = document.createElement('canvas');
+                canvas.width = width;
+                canvas.height = height;
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(img, 0, 0, width, height);
+
+                let webpDataUrl = canvas.toDataURL('image/webp', quality);
+                if (!webpDataUrl.startsWith('data:image/webp')) {
+                    webpDataUrl = canvas.toDataURL('image/jpeg', quality);
+                }
+                resolve(webpDataUrl);
+            };
+
+            if (typeof dataUrlOrFile === 'string') {
+                img.src = dataUrlOrFile;
+            } else {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    img.src = e.target.result;
+                };
+                reader.readAsDataURL(dataUrlOrFile);
+            }
+        });
+    }
+
+    if (btnSnapPhoto) {
+        btnSnapPhoto.addEventListener('click', async () => {
+            if (!cameraVideo || !cameraVideo.videoWidth) return;
+            if (snappedPhotos.length >= 7) return;
+
+            if (cameraFlashEffect) {
+                cameraFlashEffect.classList.remove('active');
+                void cameraFlashEffect.offsetWidth;
+                cameraFlashEffect.classList.add('active');
+            }
+
+            const maxDim = 1280;
+            let width = cameraVideo.videoWidth;
+            let height = cameraVideo.videoHeight;
+            if (width > maxDim || height > maxDim) {
+                if (width > height) {
+                    height = Math.round((height * maxDim) / width);
+                    width = maxDim;
+                } else {
+                    width = Math.round((width * maxDim) / height);
+                    height = maxDim;
+                }
+            }
+
+            cameraCanvas.width = width;
+            cameraCanvas.height = height;
+            const ctx = cameraCanvas.getContext('2d');
+            ctx.drawImage(cameraVideo, 0, 0, width, height);
+
+            let base64Data = cameraCanvas.toDataURL('image/webp', 0.80);
+            if (!base64Data.startsWith('data:image/webp')) {
+                base64Data = cameraCanvas.toDataURL('image/jpeg', 0.80);
+            }
+
+            const serverPath = await uploadPhotoToServer(base64Data);
+            if (serverPath) {
+                snappedPhotos.push(base64Data);
+                uploadedPhotoPaths.push(serverPath);
+            } else {
+                snappedPhotos.push(base64Data);
+                uploadedPhotoPaths.push(base64Data);
+            }
+            renderPhotoThumbnails();
+            updateSnapBtnState();
+        });
+    }
+
+    if (nativeCameraInput) {
+        nativeCameraInput.addEventListener('change', async (e) => {
+            if (isDesktopComputer() || !isMobileDevice()) {
+                nativeCameraInput.value = '';
+                showNoCameraModal();
+                return;
+            }
+
+            const files = Array.from(e.target.files || []).filter(f => f.type.startsWith('image/'));
+            if (!files || files.length === 0) return;
+
+            // Reject pre-existing screenshots or saved files from disk
+            const now = Date.now();
+            const freshFiles = files.filter(f => {
+                const ageMs = now - f.lastModified;
+                return ageMs < 120000; // Must be freshly taken within past 2 minutes
+            });
+
+            if (freshFiles.length === 0 && files.length > 0) {
+                nativeCameraInput.value = '';
+                if (typeof Swal !== 'undefined') {
+                    Swal.fire({
+                        icon: 'warning',
+                        title: 'ไม่อนุญาตให้อัปโหลดไฟล์รูปเดิม',
+                        text: 'กรุณาใช้กล้องมือถือถ่ายภาพสดเท่านั้น (ไม่อนุญาตให้เลือกรูปจากคลังภาพหรือไฟล์ที่บันทึกไว้ในเครื่อง)',
+                        confirmButtonText: 'ตกลง',
+                        confirmButtonColor: '#DC2626'
+                    });
+                } else {
+                    alert('ไม่อนุญาตให้อัปโหลดไฟล์รูปเดิม กรุณาใช้กล้องมือถือถ่ายภาพสดเท่านั้น');
+                }
+                return;
+            }
+
+            const remainingSlots = 7 - snappedPhotos.length;
+            if (remainingSlots <= 0) {
+                nativeCameraInput.value = '';
+                return;
+            }
+
+            const filesToProcess = freshFiles.slice(0, remainingSlots);
+            for (const file of filesToProcess) {
+                if (snappedPhotos.length < 7) {
+                    try {
+                        const compressed = await compressImage(file, 1280, 1280, 0.80);
+                        const serverPath = await uploadPhotoToServer(compressed);
+                        snappedPhotos.push(compressed);
+                        uploadedPhotoPaths.push(serverPath || compressed);
+                    } catch (err) {
+                        console.error("Error processing camera photo:", err);
+                    }
+                }
+            }
+            renderPhotoThumbnails();
+            updateSnapBtnState();
+            nativeCameraInput.value = '';
+        });
+    }
+
+    function renderPhotoThumbnails() {
+        if (!snappedPhotosGrid) return;
+
+        if (snappedPhotos.length === 0) {
+            snappedPhotosGrid.innerHTML = `
+                <div class="empty-photo-placeholder" id="emptyPhotoPlaceholder">
+                    <i data-lucide="camera-off" class="placeholder-icon"></i>
+                    <span>ยังไม่มีรูปถ่ายรายงาน (กรุณากดปุ่ม <strong>"ถ่ายรูปรายงานจากกล้อง"</strong> อย่างน้อย 7 รูป)</span>
+                </div>
+            `;
+        } else {
+            let html = '';
+            snappedPhotos.forEach((photo, idx) => {
+                html += `
+                    <div class="snapped-photo-card" onclick="openLightbox(${idx})">
+                        <div class="photo-card-thumb-wrapper">
+                            <img src="${photo}" alt="รูปถ่ายรายงาน #${idx + 1}" class="photo-card-thumb">
+                            <span class="photo-card-index-badge">รูปที่ ${idx + 1}</span>
+                            <div class="photo-card-overlay-hint">
+                                <i data-lucide="zoom-in"></i> กดเพื่อดูรูป
+                            </div>
+                        </div>
+                        <button type="button" class="btn-remove-photo" onclick="event.stopPropagation(); removePhoto(${idx});" title="ลบรูปนี้">
+                            <i data-lucide="trash-2"></i> ลบรูป
+                        </button>
+                    </div>
+                `;
+            });
+            snappedPhotosGrid.innerHTML = html;
+        }
+
+        syncPhotoInputs();
+
+        if (window.lucide) {
+            lucide.createIcons();
+        }
+    }
+
+    function removePhoto(index) {
+        if (index >= 0 && index < snappedPhotos.length) {
+            snappedPhotos.splice(index, 1);
+            uploadedPhotoPaths.splice(index, 1);
+            renderPhotoThumbnails();
+            updateSnapBtnState();
+        }
+    }
+
+    function openLightbox(index) {
+        if (index < 0 || index >= snappedPhotos.length) return;
+        lightboxCurrentIndex = index;
+        lightboxZoomScale = 1.0;
+        updateLightboxDisplay();
+        inpageLightboxModal.style.display = 'flex';
+    }
+
+    function closeLightbox() {
+        inpageLightboxModal.style.display = 'none';
+        lightboxZoomScale = 1.0;
+    }
+
+    function updateLightboxDisplay() {
+        if (!snappedPhotos[lightboxCurrentIndex]) return;
+        lightboxImage.src = snappedPhotos[lightboxCurrentIndex];
+        lightboxImage.style.transform = `scale(${lightboxZoomScale})`;
+        lightboxPhotoTitle.textContent = `รูปถ่ายรายงาน #${lightboxCurrentIndex + 1}`;
+        lightboxCounterBadge.textContent = `${lightboxCurrentIndex + 1} / ${snappedPhotos.length}`;
+
+        lightboxPrevBtn.style.display = (snappedPhotos.length > 1) ? 'flex' : 'none';
+        lightboxNextBtn.style.display = (snappedPhotos.length > 1) ? 'flex' : 'none';
+    }
+
+    if (lightboxCloseBtn) lightboxCloseBtn.addEventListener('click', closeLightbox);
+    if (lightboxPrevBtn) {
+        lightboxPrevBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            lightboxCurrentIndex = (lightboxCurrentIndex - 1 + snappedPhotos.length) % snappedPhotos.length;
+            lightboxZoomScale = 1.0;
+            updateLightboxDisplay();
+        });
+    }
+    if (lightboxNextBtn) {
+        lightboxNextBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            lightboxCurrentIndex = (lightboxCurrentIndex + 1) % snappedPhotos.length;
+            lightboxZoomScale = 1.0;
+            updateLightboxDisplay();
+        });
+    }
+    if (lightboxZoomIn) {
+        lightboxZoomIn.addEventListener('click', () => {
+            lightboxZoomScale = Math.min(lightboxZoomScale + 0.3, 3.0);
+            lightboxImage.style.transform = `scale(${lightboxZoomScale})`;
+        });
+    }
+    if (lightboxZoomOut) {
+        lightboxZoomOut.addEventListener('click', () => {
+            lightboxZoomScale = Math.max(lightboxZoomScale - 0.3, 0.5);
+            lightboxImage.style.transform = `scale(${lightboxZoomScale})`;
+        });
+    }
+    if (lightboxResetZoom) {
+        lightboxResetZoom.addEventListener('click', () => {
+            lightboxZoomScale = 1.0;
+            lightboxImage.style.transform = `scale(${lightboxZoomScale})`;
+        });
+    }
+
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && inpageLightboxModal.style.display === 'flex') {
+            closeLightbox();
+        } else if (e.key === 'ArrowLeft' && inpageLightboxModal.style.display === 'flex' && snappedPhotos.length > 1) {
+            lightboxCurrentIndex = (lightboxCurrentIndex - 1 + snappedPhotos.length) % snappedPhotos.length;
+            lightboxZoomScale = 1.0;
+            updateLightboxDisplay();
+        } else if (e.key === 'ArrowRight' && inpageLightboxModal.style.display === 'flex' && snappedPhotos.length > 1) {
+            lightboxCurrentIndex = (lightboxCurrentIndex + 1) % snappedPhotos.length;
+            lightboxZoomScale = 1.0;
+            updateLightboxDisplay();
+        }
+    });
+
+    // ================= FORM SUBMISSION & VALIDATION =================
+    const morningAuditForm = document.getElementById('morningAuditSheetForm');
+    if (morningAuditForm) {
+        morningAuditForm.addEventListener('submit', (e) => {
+            const submitBtn = document.getElementById('sheetSubmitBtn');
+            if (!IS_ADMIN && submitBtn && submitBtn.disabled) {
+                e.preventDefault();
+                alert('รายงานประจำวันนี้ของสาขานี้ได้ถูกส่งเรียบร้อยแล้ว');
+                return false;
+            }
+
+            compileMorningBrief();
+
+            // Validate all 36 items are checked
+            const checkedRadios = document.querySelectorAll('.audit-item-row input[type="radio"]:checked');
+            if (checkedRadios.length < totalItems) {
+                e.preventDefault();
+                let firstUncheckedRow = null;
+                document.querySelectorAll('.audit-item-row').forEach(row => {
+                    if (!row.querySelector('input[type="radio"]:checked') && !firstUncheckedRow) {
+                        firstUncheckedRow = row;
+                    }
+                });
+
+                if (typeof Swal !== 'undefined') {
+                    Swal.fire({
+                        icon: 'warning',
+                        title: 'ประเมินไม่ครบทุกข้อ',
+                        text: `กรุณาตรวจและเลือกผลการตรวจให้ครบทุกข้อ (${checkedRadios.length}/${totalItems} ข้อ)`,
+                        confirmButtonText: 'ตกลง',
+                        confirmButtonColor: '#DC2626'
+                    });
+                } else {
+                    alert(`กรุณาตรวจและเลือกผลการตรวจให้ครบทุกข้อ (${checkedRadios.length}/${totalItems} ข้อ)`);
+                }
+
+                if (firstUncheckedRow) {
+                    firstUncheckedRow.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    firstUncheckedRow.style.outline = '2px solid #DC2626';
+                    setTimeout(() => { firstUncheckedRow.style.outline = ''; }, 3500);
+                }
+                return false;
+            }
+
+            // Validate mandatory 7 photos
+            if (snappedPhotos.length < 7) {
+                e.preventDefault();
+
+                if (typeof Swal !== 'undefined') {
+                    Swal.fire({
+                        icon: 'warning',
+                        title: 'แจ้งเตือน',
+                        text: 'กรุณาถ่ายรูปรายงานอย่างน้อย 7 รูป',
+                        confirmButtonText: 'ตกลง',
+                        confirmButtonColor: '#DC2626'
+                    });
+                } else {
+                    alert('กรุณาถ่ายรูปรายงานอย่างน้อย 7 รูป');
+                }
+
+                const photoCard = document.getElementById('reportPhotoSection');
+                if (photoCard) {
+                    photoCard.classList.add('highlight-error');
+                    photoCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    setTimeout(() => {
+                        photoCard.classList.remove('highlight-error');
+                    }, 3500);
+                }
+                return false;
+            }
+
+            syncPhotoInputs();
+        });
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+        syncBranchDate();
+
+        // Initialize all rows based on current radio status
+        const checkedRadios = document.querySelectorAll('input[type="radio"]:checked');
+        checkedRadios.forEach(radio => {
+            const itemId = radio.name.replace('status_', '');
+            onStatusChange(itemId, radio.value);
+        });
+        updateStats();
+
+        // Initialize signature popup canvas
+        initSignatureModalCanvas();
+
+        // Initialize default morning brief row if empty
+        const mbBody = document.getElementById('morningBriefBody');
+        if (mbBody && mbBody.children.length === 0) {
+            addMorningBriefRow();
+        }
+
+        renderPhotoThumbnails();
+        applyDeviceCameraVisibility();
+        syncMorningBriefPlacement();
+
+        if (window.lucide) {
+            lucide.createIcons();
+        }
+    });
+
+    function syncMorningBriefPlacement() {
+        const isMobile = window.innerWidth <= 768;
+        const mbContainer = document.getElementById('mainMbContainer');
+        const desktopCell = document.getElementById('mbDesktopCell');
+        const mobileCell = document.getElementById('mbMobileCell');
+        const mobileRow = document.getElementById('mbMobileRow');
+        if (!mbContainer) return;
+        if (isMobile) {
+            if (mobileCell && mbContainer.parentElement !== mobileCell) {
+                mobileCell.appendChild(mbContainer);
+            }
+            if (mobileRow) mobileRow.style.display = 'block';
+        } else {
+            if (desktopCell && mbContainer.parentElement !== desktopCell) {
+                desktopCell.appendChild(mbContainer);
+            }
+            if (mobileRow) mobileRow.style.display = 'none';
+        }
+    }
+    window.addEventListener('resize', syncMorningBriefPlacement);
+</script>
+{% endblock %}

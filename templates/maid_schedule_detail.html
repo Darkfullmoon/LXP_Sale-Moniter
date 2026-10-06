@@ -1,0 +1,710 @@
+{% extends "app_layout.html" %}
+
+{% block title %}รายละเอียดตารางแม่บ้าน {{ schedule.branch }} ({{ month_th }}) - LXP Monitor{% endblock %}
+
+{% block breadcrumb %}
+<span class="breadcrumb-item"><a href="{{ url_for('dashboard') }}">หน้าหลัก</a></span>
+<span class="breadcrumb-separator">/</span>
+<span class="breadcrumb-item"><a href="{{ url_for('maid.maid_schedule_history') }}">ประวัติตารางแม่บ้าน</a></span>
+<span class="breadcrumb-separator">/</span>
+<span class="breadcrumb-item active">{{ schedule.branch }} ({{ month_th }})</span>
+{% endblock %}
+
+{% block content %}
+<div class="maid-detail-container">
+    <!-- Top Action Card -->
+    <div class="content-card"
+        style="padding: 16px 20px; margin-bottom: 16px; background: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 14px; box-shadow: 0 4px 18px rgba(0,0,0,0.04);">
+        <div style="display: flex; align-items: center; justify-content: space-between; gap: 14px; flex-wrap: wrap;">
+            <div>
+                <a href="{{ url_for('maid.maid_schedule_history') }}"
+                    style="display: inline-flex; align-items: center; gap: 6px; color: #64748B; text-decoration: none; font-size: 0.86rem; font-weight: 600; margin-bottom: 4px;">
+                    <i data-lucide="arrow-left" style="width: 15px; height: 15px;"></i>
+                    <span>กลับไปหน้ารายการประวัติ</span>
+                </a>
+                <h1 style="margin: 0; font-size: 1.25rem; font-weight: 700; color: #0F172A;">
+                    ตารางการทำงานแม่บ้าน สาขา {{ schedule.branch }} ประจำเดือน {{ month_th }}
+                </h1>
+            </div>
+
+            {% if current_user.role == 'ADMIN' %}
+            <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+                <button type="button" onclick="openPrintPreviewModal('{{ url_for('maid.maid_schedule_pdf', schedule_id=schedule.id) }}')"
+                    class="btn-primary-modern"
+                    style="display: inline-flex; align-items: center; gap: 6px; padding: 8px 18px; border-radius: 8px; background: #DC2626; color: #FFFFFF; font-size: 0.88rem; font-weight: 700; border: none; cursor: pointer; box-shadow: 0 4px 12px rgba(220,38,38,0.25);">
+                    <i data-lucide="printer" style="width: 16px; height: 16px;"></i>
+                    <span>พิมพ์เอกสาร</span>
+                </button>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Read-Only Sheet Paper -->
+    <div class="sheet-paper-container">
+        <!-- Header -->
+        <div class="sheet-header-section"
+            style="margin-bottom: 12px; border-bottom: 2px solid #E2E8F0; padding-bottom: 12px;">
+            <div
+                style="display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap;">
+                <div style="display: flex; align-items: center; gap: 14px;">
+                    <img src="{{ url_for('static', filename='img/landy_logo.png') }}" alt="Landy Logo"
+                        style="height: 38px; width: auto; object-fit: contain;">
+                    <div>
+                        <h2 style="margin: 0; font-size: 1.15rem; font-weight: 700; color: #0F172A; line-height: 1.3;">
+                            ตารางการทำงานแม่บ้าน สำนักงานขายประจำวัน
+                        </h2>
+                        <div style="margin-top: 4px; font-size: 0.88rem; color: #475569; font-weight: 600;">
+                            สาขา: <span style="color: #DC2626; font-weight: 700;">{{ schedule.branch }}</span>
+                            &nbsp;&nbsp;|&nbsp;&nbsp;
+                            ตารางเดือน: <span style="color: #0F172A; font-weight: 700;">{{ month_th }}</span>
+                            &nbsp;&nbsp;|&nbsp;&nbsp;
+                            ผู้บันทึก: <span class="user-pill">{{ schedule.submitted_by }}</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Table 1: Daily Tasks -->
+        <div class="table-section-title"
+            style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
+            <div
+                style="display: flex; align-items: center; gap: 6px; font-size: 0.96rem; font-weight: 700; color: #0F172A;">
+                <span
+                    style="background: #DC2626; color: #FFFFFF; width: 22px; height: 22px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; font-size: 0.78rem;">1</span>
+                <span>ตารางการทำงานประจำวัน</span>
+            </div>
+        </div>
+
+        <div class="maid-table-wrapper">
+            <table class="maid-grid-table">
+                <thead>
+                    <tr>
+                        <th class="col-sticky col-no" style="width: 45px;">ลำดับ</th>
+                        <th class="col-sticky col-desc" style="width: 240px;">รายละเอียด</th>
+                        <th class="col-sticky col-time" style="width: 110px;">ช่วงเวลาทำงาน</th>
+                        {% for d in range(1, 32) %}
+                        <th class="col-day {% if d > days_in_month %}col-disabled{% endif %}" style="width: 32px;">{{ d
+                            }}</th>
+                        {% endfor %}
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for task in daily_tasks %}
+                    <tr class="{% if task.is_break %}row-break{% endif %}">
+                        <td class="col-sticky col-no text-center font-bold">{{ task.no }}</td>
+                        <td class="col-sticky col-desc {% if task.is_break %}font-bold text-amber{% endif %}">{{
+                            task.title }}</td>
+                        <td class="col-sticky col-time text-center">{{ task.time_slot }}</td>
+                        {% for d in range(1, 32) %}
+                        <td
+                            class="col-day text-center {% if d > days_in_month %}col-disabled{% elif task.is_break %}cell-break{% endif %}">
+                            {% if d <= days_in_month %} {% if task.is_break %} <span class="text-dim-dash">-</span>
+                                {% else %}
+                                {% set cell_key = task.no ~ '_' ~ d %}
+                                {% if sheet_data.daily and sheet_data.daily.get(cell_key) %}
+                                <span class="badge-checked">✓</span>
+                                {% endif %}
+                                {% endif %}
+                                {% endif %}
+                        </td>
+                        {% endfor %}
+                    </tr>
+                    {% endfor %}
+
+                    <!-- Worker Initials -->
+                    <tr class="row-initials row-worker">
+                        <td class="col-sticky col-no text-center font-bold" style="background: #EFF6FF;">-</td>
+                        <td class="col-sticky col-desc font-bold text-blue" style="background: #EFF6FF;">ชื่อผู้ทำ</td>
+                        <td class="col-sticky col-time text-center" style="background: #EFF6FF;">ชื่อย่อ</td>
+                        {% for d in range(1, 32) %}
+                        <td class="col-day text-center font-bold text-blue {% if d > days_in_month %}col-disabled{% endif %}"
+                            style="background: #EFF6FF; font-size: 0.78rem;">
+                            {% if d <= days_in_month %} {{ (sheet_data.worker_initials.get(d|string) if
+                                sheet_data.worker_initials else '' ) or '' }} {% endif %} </td>
+                                {% endfor %}
+                    </tr>
+
+                    <!-- Inspector Initials -->
+                    <tr class="row-initials row-inspector">
+                        <td class="col-sticky col-no text-center font-bold" style="background: #F0FDF4;">-</td>
+                        <td class="col-sticky col-desc font-bold text-green" style="background: #F0FDF4;">ชื่อผู้ตรวจ
+                        </td>
+                        <td class="col-sticky col-time text-center" style="background: #F0FDF4;">ชื่อย่อ</td>
+                        {% for d in range(1, 32) %}
+                        <td class="col-day text-center font-bold text-green {% if d > days_in_month %}col-disabled{% endif %}"
+                            style="background: #F0FDF4; font-size: 0.78rem;">
+                            {% if d <= days_in_month %} {{ (sheet_data.inspector_initials.get(d|string) if
+                                sheet_data.inspector_initials else '' ) or '' }} {% endif %} </td>
+                                {% endfor %}
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Table 2: Weekly Tasks -->
+        <div class="table-section-title"
+            style="display: flex; align-items: center; justify-content: space-between; margin-top: 24px; margin-bottom: 8px;">
+            <div
+                style="display: flex; align-items: center; gap: 6px; font-size: 0.96rem; font-weight: 700; color: #0F172A;">
+                <span
+                    style="background: #2563EB; color: #FFFFFF; width: 22px; height: 22px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; font-size: 0.78rem;">2</span>
+                <span>ตารางการทำงานประจำสัปดาห์</span>
+            </div>
+        </div>
+
+        <div class="maid-table-wrapper">
+            <table class="maid-grid-table">
+                <thead>
+                    <tr>
+                        <th class="col-sticky col-no" style="width: 45px;">ลำดับ</th>
+                        <th class="col-sticky col-desc" style="width: 240px;">รายละเอียด</th>
+                        <th class="col-sticky col-time" style="width: 110px;">ช่วงเวลาทำงาน</th>
+                        {% for d in range(1, 32) %}
+                        <th class="col-day {% if d > days_in_month %}col-disabled{% endif %}" style="width: 32px;">{{ d
+                            }}</th>
+                        {% endfor %}
+                    </tr>
+                </thead>
+                <tbody>
+                    <!-- Dynamic 7-day Rolling Weekly Tasks (20 to 23) -->
+                    {% for task_no in [20, 21, 22, 23] %}
+                    {% set item = weekly_layout.get(task_no) %}
+                    {% if item %}
+                    {% set task = item.task %}
+                    <tr>
+                        <td class="col-sticky col-no text-center font-bold">{{ task.no }}</td>
+                        <td class="col-sticky col-desc">{{ task.title }}</td>
+                        <td class="col-sticky col-time text-center">{{ task.time_slot }}</td>
+                        {% for seg in item.segments %}
+                            {% if seg.type == 'open' %}
+                                {% set val = sheet_data.weekly.get(seg.key) if sheet_data and sheet_data.weekly else '' %}
+                                {% if not val %}
+                                    {% set val = sheet_data.weekly.get(task.no|string) if sheet_data and sheet_data.weekly else '' %}
+                                {% endif %}
+                                <td colspan="{{ seg.colspan }}" class="cell-week-open text-center font-bold text-blue" style="font-size: 0.95rem;">
+                                    {{ val or '-' }}
+                                </td>
+                            {% else %}
+                                <td colspan="{{ seg.colspan }}" class="cell-week-blocked"></td>
+                            {% endif %}
+                        {% endfor %}
+                    </tr>
+                    {% endif %}
+                    {% endfor %}
+
+                    <!-- Weekly Worker Initials -->
+                    <tr class="row-initials row-worker">
+                        <td class="col-sticky col-no text-center font-bold" style="background: #EFF6FF;">-</td>
+                        <td class="col-sticky col-desc font-bold text-blue" style="background: #EFF6FF;">ชื่อผู้ทำ</td>
+                        <td class="col-sticky col-time text-center" style="background: #EFF6FF;">ชื่อย่อ</td>
+                        {% for d in range(1, 32) %}
+                        <td class="col-day text-center font-bold text-blue {% if d > days_in_month %}col-disabled{% endif %}"
+                            style="background: #EFF6FF; font-size: 0.78rem;">
+                            {% if d <= days_in_month %} {{ (sheet_data.weekly_worker_initials.get(d|string) if
+                                sheet_data.weekly_worker_initials else '' ) or '' }} {% endif %} </td>
+                                {% endfor %}
+                    </tr>
+
+                    <!-- Weekly Inspector Initials -->
+                    <tr class="row-initials row-inspector">
+                        <td class="col-sticky col-no text-center font-bold" style="background: #F0FDF4;">-</td>
+                        <td class="col-sticky col-desc font-bold text-green" style="background: #F0FDF4;">ชื่อผู้ตรวจ
+                        </td>
+                        <td class="col-sticky col-time text-center" style="background: #F0FDF4;">ชื่อย่อ</td>
+                        {% for d in range(1, 32) %}
+                        <td class="col-day text-center font-bold text-green {% if d > days_in_month %}col-disabled{% endif %}"
+                            style="background: #F0FDF4; font-size: 0.78rem;">
+                            {% if d <= days_in_month %} {{ (sheet_data.weekly_inspector_initials.get(d|string) if
+                                sheet_data.weekly_inspector_initials else '' ) or '' }} {% endif %} </td>
+                                {% endfor %}
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<style>
+    .maid-detail-container {
+        width: 100%;
+        max-width: 100%;
+        margin: 0 auto;
+        padding-bottom: 40px;
+    }
+
+    .sheet-paper-container {
+        background: #FFFFFF;
+        border: 1px solid #CBD5E1;
+        border-radius: 14px;
+        padding: 20px;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+        box-sizing: border-box;
+    }
+
+    .maid-table-wrapper {
+        width: 100%;
+        max-width: 100%;
+        overflow-x: auto !important;
+        overflow-y: hidden;
+        -webkit-overflow-scrolling: touch !important;
+        touch-action: pan-x pan-y !important;
+        border: 1px solid #CBD5E1;
+        border-radius: 10px;
+        background: #FFFFFF;
+        box-sizing: border-box;
+    }
+
+    .maid-grid-table {
+        min-width: 1350px !important;
+        width: max-content !important;
+        border-collapse: separate;
+        border-spacing: 0;
+        font-size: 0.86rem;
+        table-layout: fixed;
+        background: #FFFFFF;
+    }
+
+    .maid-grid-table th,
+    .maid-grid-table td {
+        border-right: 1px solid #E2E8F0;
+        border-bottom: 1px solid #E2E8F0;
+        padding: 6px 4px;
+        vertical-align: middle;
+        box-sizing: border-box;
+    }
+
+    .maid-grid-table th {
+        background: #F8FAFC;
+        color: #1E293B;
+        font-weight: 700;
+        font-size: 0.82rem;
+        text-align: center;
+        position: sticky;
+        top: 0;
+        z-index: 10;
+    }
+
+    /* Sticky columns on horizontal scroll (Desktop) */
+    .col-sticky {
+        position: sticky !important;
+        background: #FFFFFF !important;
+        z-index: 4 !important;
+    }
+
+    th.col-sticky {
+        z-index: 14 !important;
+        background: #F8FAFC !important;
+    }
+
+    .col-no {
+        left: 0;
+        width: 45px;
+        min-width: 45px;
+        max-width: 45px;
+        text-align: center;
+    }
+
+    .col-desc {
+        left: 45px;
+        width: 240px;
+        min-width: 240px;
+        max-width: 240px;
+        white-space: normal;
+        line-height: 1.3;
+        font-weight: 500;
+        padding: 6px 8px !important;
+    }
+
+    .col-time {
+        left: 285px;
+        width: 110px;
+        min-width: 110px;
+        max-width: 110px;
+        white-space: nowrap;
+        font-size: 0.8rem;
+        color: #475569;
+        font-weight: 600;
+        text-align: center;
+        border-right: 2px solid #94A3B8 !important;
+        box-shadow: 3px 0 6px -2px rgba(0, 0, 0, 0.08) !important;
+    }
+
+    .col-day {
+        width: 38px;
+        min-width: 38px;
+        max-width: 38px;
+        text-align: center;
+        padding: 3px 1px !important;
+    }
+
+    /* Mobile & Tablet Responsiveness (<= 768px) */
+    @media (max-width: 768px) {
+        .sheet-paper-container {
+            padding: 12px 8px !important;
+            border-radius: 10px !important;
+        }
+
+        .maid-grid-table {
+            min-width: 1200px !important;
+        }
+
+        .col-no {
+            left: 0 !important;
+            width: 32px !important;
+            min-width: 32px !important;
+            max-width: 32px !important;
+            font-size: 0.76rem !important;
+            padding: 4px 1px !important;
+        }
+
+        .col-desc {
+            left: 32px !important;
+            width: 140px !important;
+            min-width: 140px !important;
+            max-width: 140px !important;
+            font-size: 0.76rem !important;
+            padding: 4px 6px !important;
+            border-right: 2px solid #94A3B8 !important;
+            box-shadow: 3px 0 6px -2px rgba(0, 0, 0, 0.12) !important;
+        }
+
+        .col-time {
+            position: static !important;
+            left: auto !important;
+            box-shadow: none !important;
+            border-right: 1px solid #E2E8F0 !important;
+            width: 85px !important;
+            min-width: 85px !important;
+            max-width: 85px !important;
+            font-size: 0.72rem !important;
+        }
+
+        th.col-time {
+            position: sticky !important;
+            top: 0 !important;
+            left: auto !important;
+            z-index: 10 !important;
+        }
+
+        .col-day {
+            width: 36px !important;
+            min-width: 36px !important;
+            max-width: 36px !important;
+        }
+    }
+
+    .col-disabled {
+        background: #F1F5F9 !important;
+        cursor: not-allowed;
+    }
+
+    .row-break td.col-sticky {
+        background: #FFFBEB !important;
+    }
+
+    .row-break {
+        background: #FFFBEB;
+    }
+
+    .cell-break {
+        background: #FEF3C7;
+    }
+
+    .text-amber {
+        color: #B45309;
+    }
+
+    .text-blue {
+        color: #1D4ED8;
+    }
+
+    .text-green {
+        color: #15803D;
+    }
+
+    .text-dim-dash {
+        color: #94A3B8;
+        font-weight: bold;
+    }
+
+    .badge-checked {
+        display: inline-block;
+        color: #15803D;
+        font-weight: 900;
+        font-size: 1.05rem;
+    }
+
+    .row-worker td.col-sticky {
+        background: #EFF6FF !important;
+    }
+
+    .row-inspector td.col-sticky {
+        background: #F0FDF4 !important;
+    }
+
+    /* Weekly Table Blocked and Open Cells */
+    .cell-week-blocked {
+        background-color: #E2E8F0 !important;
+        background-image: repeating-linear-gradient(45deg, #E2E8F0, #E2E8F0 6px, #CBD5E1 6px, #CBD5E1 12px) !important;
+        border-right: 1px solid #CBD5E1 !important;
+        cursor: not-allowed;
+    }
+
+    .cell-week-open {
+        background: #FFFFFF !important;
+        padding: 3px 2px !important;
+        text-align: center;
+        vertical-align: middle;
+        white-space: nowrap;
+        font-size: 0.84rem !important;
+        letter-spacing: -0.2px;
+    }
+</style>
+
+<!-- ================= IN-PAGE PRINT PREVIEW & EXPORT MODAL ================= -->
+<div class="print-modal-overlay" id="printPreviewModal" onclick="closePrintPreviewOnBackdrop(event)">
+    <div class="print-modal-dialog">
+        <div class="print-modal-header">
+            <div class="print-modal-title">
+                <i data-lucide="printer"></i>
+                <span>ตัวอย่างเอกสารก่อนพิมพ์ (Document Preview) - ตารางการทำงานแม่บ้าน</span>
+            </div>
+            <div class="print-modal-actions">
+                <!-- Export to PDF Button inside Modal -->
+                <a href="{{ url_for('maid.maid_schedule_pdf', schedule_id=schedule.id, export=1) }}" class="btn-modal-export-pdf" title="ดาวน์โหลดไฟล์ PDF คุณภาพสูง (THSarabun)">
+                    <i data-lucide="download"></i> Export เป็น PDF
+                </a>
+                <!-- Direct Print Button inside Modal -->
+                <button type="button" class="btn-modal-print" onclick="triggerDocumentPrint()" title="สั่งพิมพ์เอกสาร">
+                    <i data-lucide="printer"></i> สั่งพิมพ์
+                </button>
+                <!-- Close Button -->
+                <button type="button" class="btn-modal-close" onclick="closePrintPreviewModal()" title="ปิดหน้าต่าง (Esc)">
+                    <i data-lucide="x"></i> ปิด
+                </button>
+            </div>
+        </div>
+        <div class="print-modal-body" id="printModalBody">
+            <iframe id="printPdfPreviewIframe" class="print-preview-iframe" src="about:blank"></iframe>
+        </div>
+    </div>
+</div>
+
+<style>
+/* Modal Styling */
+.print-modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: rgba(15, 23, 42, 0.75);
+    backdrop-filter: blur(5px);
+    z-index: 99999;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    box-sizing: border-box;
+}
+
+.print-modal-overlay.active {
+    display: flex !important;
+}
+
+.print-modal-dialog {
+    background: #0F172A;
+    border-radius: 14px;
+    width: 100%;
+    max-width: 1060px;
+    height: 90vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+    border: 1px solid #334155;
+}
+
+.print-modal-header {
+    background: #0F172A;
+    color: #FFFFFF;
+    padding: 12px 20px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 14px;
+    flex-wrap: wrap;
+    border-bottom: 1px solid #334155;
+}
+
+.print-modal-title {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 1.02rem;
+    font-weight: 700;
+}
+
+.print-modal-title i, .print-modal-title svg {
+    width: 20px;
+    height: 20px;
+    color: #38BDF8;
+}
+
+.print-modal-actions {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.btn-modal-export-pdf {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: linear-gradient(135deg, #2563EB 0%, #1D4ED8 100%);
+    color: #FFFFFF;
+    border: none;
+    padding: 7px 16px;
+    border-radius: 8px;
+    font-size: 0.88rem;
+    font-weight: 700;
+    text-decoration: none;
+    cursor: pointer;
+    box-shadow: 0 2px 8px rgba(37, 99, 235, 0.3);
+    transition: all 0.2s ease;
+}
+
+.btn-modal-export-pdf:hover {
+    background: #1D4ED8;
+    transform: translateY(-1px);
+    color: #FFFFFF;
+}
+
+.btn-modal-print {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: #DC2626;
+    color: #FFFFFF;
+    border: none;
+    padding: 7px 18px;
+    border-radius: 8px;
+    font-size: 0.88rem;
+    font-weight: 700;
+    cursor: pointer;
+    box-shadow: 0 2px 8px rgba(220, 38, 38, 0.3);
+    transition: all 0.2s ease;
+}
+
+.btn-modal-print:hover {
+    background: #B91C1C;
+    transform: translateY(-1px);
+}
+
+.btn-modal-close {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    background: rgba(255, 255, 255, 0.12);
+    color: #FFFFFF;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    padding: 7px 14px;
+    border-radius: 8px;
+    font-size: 0.88rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.btn-modal-close:hover {
+    background: rgba(255, 255, 255, 0.22);
+}
+
+.print-modal-body {
+    padding: 0;
+    flex: 1;
+    overflow: hidden;
+    background: #475569;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.print-preview-iframe {
+    width: 100%;
+    height: 100%;
+    border: none;
+    background: #FFFFFF;
+}
+</style>
+
+<script>
+    function openPrintPreviewModal(pdfUrl) {
+        const modal = document.getElementById('printPreviewModal');
+        if (!modal) return;
+        
+        const iframe = document.getElementById('printPdfPreviewIframe');
+        if (iframe && pdfUrl) {
+            if (!iframe.src || iframe.src === 'about:blank' || !iframe.src.includes(pdfUrl)) {
+                iframe.src = pdfUrl + '#view=FitH';
+            }
+        }
+        
+        modal.style.display = 'flex';
+        modal.classList.add('active');
+        document.body.style.overflow = 'hidden';
+        
+        if (window.lucide) {
+            lucide.createIcons();
+        }
+    }
+
+    function closePrintPreviewModal() {
+        const modal = document.getElementById('printPreviewModal');
+        if (modal) {
+            modal.style.display = 'none';
+            modal.classList.remove('active');
+        }
+        document.body.style.overflow = '';
+    }
+
+    function triggerDocumentPrint() {
+        const iframe = document.getElementById('printPdfPreviewIframe');
+        if (iframe && iframe.contentWindow) {
+            try {
+                iframe.contentWindow.focus();
+                iframe.contentWindow.print();
+                return;
+            } catch (err) {
+                console.warn('Iframe print failed, falling back to window.print():', err);
+            }
+        }
+        
+        closePrintPreviewModal();
+        setTimeout(() => {
+            window.print();
+        }, 200);
+    }
+
+    function closePrintPreviewOnBackdrop(e) {
+        if (e.target.id === 'printPreviewModal') {
+            closePrintPreviewModal();
+        }
+    }
+
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && document.getElementById('printPreviewModal')?.classList.contains('active')) {
+            closePrintPreviewModal();
+        }
+    });
+
+    document.addEventListener('DOMContentLoaded', () => {
+        if (window.lucide) {
+            lucide.createIcons();
+        }
+    });
+</script>
+{% endblock %}

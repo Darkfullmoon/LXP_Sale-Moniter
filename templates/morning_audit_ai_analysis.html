@@ -1,0 +1,424 @@
+{% extends "app_layout.html" %}
+
+{% block title %}ผลวิเคราะห์ AI - Morning Audit {{ audit.branch }} ({{ audit.audit_date | format_date }}) - LXP Sale Monitor{% endblock %}
+
+{% block breadcrumb %}
+<span class="breadcrumb-item"><a href="{{ url_for('dashboard') }}">หน้าหลัก</a></span>
+<span class="breadcrumb-separator">/</span>
+<span class="breadcrumb-item"><a href="{{ url_for('morning_audit_history') }}">ประวัติ Morning Audit</a></span>
+<span class="breadcrumb-separator">/</span>
+<span class="breadcrumb-item active">ผลวิเคราะห์ AI ({{ audit.branch }})</span>
+{% endblock %}
+
+{% block content %}
+<div class="ai-analysis-container">
+    <!-- Header Section -->
+    <div class="page-header" style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 16px; margin-bottom: 20px;">
+        <div>
+            <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 6px;">
+                <span class="badge-branch-tag">
+                    <i data-lucide="map-pin" style="width: 15px; height: 15px;"></i>
+                    <span>{{ audit.branch }}</span>
+                </span>
+                <span class="badge-date-tag">
+                    <i data-lucide="calendar" style="width: 15px; height: 15px;"></i>
+                    <span>{{ audit.audit_date | format_date }}</span>
+                </span>
+                <span class="badge-auditor-tag">
+                    <i data-lucide="user-check" style="width: 15px; height: 15px;"></i>
+                    <span>ผู้ตรวจ: {{ audit.submitted_by }}</span>
+                </span>
+            </div>
+            <h1 class="page-title" style="font-size: 1.55rem; font-weight: 700; color: #0F172A; margin: 0; display: flex; align-items: center; gap: 8px;">
+                <i data-lucide="sparkles" style="color: #8B5CF6; width: 26px; height: 26px;"></i>
+                <span>บทวิเคราะห์ผู้บริหารโดย AI (Morning Audit FM-MS-007)</span>
+            </h1>
+        </div>
+
+        <!-- Action Header Buttons -->
+        <div class="header-actions" style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+            <a href="{{ url_for('morning_audit_history') }}" class="btn-sheet-secondary" style="display: inline-flex; align-items: center; gap: 6px; padding: 9px 15px; border-radius: 9px; text-decoration: none; font-weight: 600; font-size: 0.9rem;">
+                <i data-lucide="arrow-left" style="width: 16px; height: 16px;"></i>
+                <span>กลับประวัติ</span>
+            </a>
+            <a href="{{ url_for('morning_audit_detail', audit_id=audit.id) }}" class="btn-sheet-secondary" style="display: inline-flex; align-items: center; gap: 6px; padding: 9px 15px; border-radius: 9px; text-decoration: none; font-weight: 600; font-size: 0.9rem; color: #2563EB; border-color: #BFDBFE; background: #EFF6FF;">
+                <i data-lucide="file-text" style="width: 16px; height: 16px;"></i>
+                <span>ดูรายงานฉบับเต็ม</span>
+            </a>
+            <a href="{{ url_for('morning_audit_ai_analysis', audit_id=audit.id, refresh=1) }}" class="btn-action-primary btn-ai-reanalyze" title="ส่งข้อมูลให้ AI วิเคราะห์และอัปเดตใหม่" style="background: linear-gradient(135deg, #8B5CF6 0%, #6366F1 100%); font-size: 0.9rem; padding: 9px 16px; box-shadow: 0 4px 14px rgba(139, 92, 246, 0.35);">
+                <i data-lucide="rotate-cw" style="width: 16px; height: 16px;"></i>
+                <span>วิเคราะห์ใหม่อีกครั้ง</span>
+            </a>
+        </div>
+    </div>
+
+    <!-- Scorecard Metrics Grid -->
+    <div class="stats-grid" style="grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); margin-bottom: 22px;">
+        <!-- Card 1: Pass Rate % -->
+        <div class="stat-card" style="border-top: 4px solid #10B981; background: #FFFFFF; box-shadow: 0 4px 16px rgba(0, 0, 0, 0.04); border-radius: 12px; padding: 18px 20px;">
+            <div class="stat-card-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                <span class="stat-card-title" style="font-size: 0.9rem; font-weight: 700; color: #334155;">สัดส่วนผ่านเกณฑ์ (PASS)</span>
+                <div class="stat-card-icon" style="background: #ECFDF5; color: #059669; width: 36px; height: 36px; border-radius: 8px; display: flex; align-items: center; justify-content: center;">
+                    <i data-lucide="check-circle-2" style="width: 20px; height: 20px;"></i>
+                </div>
+            </div>
+            <div class="stat-card-value text-success" style="font-size: 2.2rem; font-weight: 800; color: #10B981 !important; line-height: 1.1;">
+                {{ stats.pass_pct }}%
+            </div>
+            <span class="stat-card-desc" style="font-size: 0.85rem; color: #64748B; font-weight: 500; margin-top: 4px; display: block;">
+                ผ่าน {{ stats.passed_items }} จาก {{ stats.total_items }} ข้อ
+            </span>
+        </div>
+
+        <!-- Card 2: Fail Rate % -->
+        <div class="stat-card" style="border-top: 4px solid #DC2626; background: #FFFFFF; box-shadow: 0 4px 16px rgba(0, 0, 0, 0.04); border-radius: 12px; padding: 18px 20px;">
+            <div class="stat-card-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                <span class="stat-card-title" style="font-size: 0.9rem; font-weight: 700; color: #334155;">สัดส่วนไม่ผ่าน (FAIL)</span>
+                <div class="stat-card-icon" style="background: #FEF2F2; color: #DC2626; width: 36px; height: 36px; border-radius: 8px; display: flex; align-items: center; justify-content: center;">
+                    <i data-lucide="alert-triangle" style="width: 20px; height: 20px;"></i>
+                </div>
+            </div>
+            <div class="stat-card-value text-danger" style="font-size: 2.2rem; font-weight: 800; color: #DC2626 !important; line-height: 1.1;">
+                {{ stats.fail_pct }}%
+            </div>
+            <span class="stat-card-desc" style="font-size: 0.85rem; color: #64748B; font-weight: 500; margin-top: 4px; display: block;">
+                ไม่ผ่านเกณฑ์ {{ stats.failed_items }} ข้อ
+            </span>
+        </div>
+
+        <!-- Card 3: Total Items -->
+        <div class="stat-card" style="border-top: 4px solid #6366F1; background: #FFFFFF; box-shadow: 0 4px 16px rgba(0, 0, 0, 0.04); border-radius: 12px; padding: 18px 20px;">
+            <div class="stat-card-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                <span class="stat-card-title" style="font-size: 0.9rem; font-weight: 700; color: #334155;">รายการตรวจสอบทั้งหมด</span>
+                <div class="stat-card-icon" style="background: #EEF2FF; color: #4F46E5; width: 36px; height: 36px; border-radius: 8px; display: flex; align-items: center; justify-content: center;">
+                    <i data-lucide="list-checks" style="width: 20px; height: 20px;"></i>
+                </div>
+            </div>
+            <div class="stat-card-value" style="font-size: 2.2rem; font-weight: 800; color: #0F172A; line-height: 1.1;">
+                {{ stats.total_items }}
+            </div>
+            <span class="stat-card-desc" style="font-size: 0.85rem; color: #64748B; font-weight: 500; margin-top: 4px; display: block;">
+                ข้อตรวจตามแบบฟอร์ม FM-MS-007
+            </span>
+        </div>
+    </div>
+
+    <!-- MAIN AI REPORT CARD -->
+    <div class="content-card ai-output-card" style="border: 1px solid #E2E8F0; border-radius: 16px; overflow: hidden; box-shadow: 0 6px 24px rgba(0, 0, 0, 0.05); margin-bottom: 24px; background: #FFFFFF;">
+        <!-- Card Header with Gradient Accent -->
+        <div class="ai-report-header" style="background: linear-gradient(135deg, #FAF5FF 0%, #F5F3FF 100%); border-bottom: 1px solid #EDE9FE; padding: 18px 24px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px;">
+            <div style="display: flex; align-items: center; gap: 12px;">
+                <div style="width: 38px; height: 38px; border-radius: 10px; background: linear-gradient(135deg, #8B5CF6, #6366F1); display: flex; align-items: center; justify-content: center; color: #FFFFFF; box-shadow: 0 4px 10px rgba(139, 92, 246, 0.35);">
+                    <i data-lucide="file-spreadsheet" style="width: 20px; height: 20px;"></i>
+                </div>
+                <div>
+                    <h2 style="font-size: 1.15rem; font-weight: 700; color: #1E1B4B; margin: 0;">
+                        Executive Summary & Management Insights
+                    </h2>
+                    <span style="font-size: 0.82rem; color: #6D28D9; font-weight: 500;">
+                        รายงานวิเคราะห์เจาะจงรายสาขา ประจำรอบวันที่ {{ audit.audit_date | format_date }}
+                    </span>
+                </div>
+            </div>
+
+            <!-- Card Actions: Copy & Print -->
+            <div style="display: flex; align-items: center; gap: 8px;">
+                <button type="button" class="btn-sheet-secondary" onclick="copyAiOutput()" id="copyReportBtn" style="padding: 7px 14px; font-size: 0.85rem; border-radius: 8px;">
+                    <i data-lucide="copy" style="width: 14px; height: 14px;"></i>
+                    <span id="copyBtnText">คัดลอกบทวิเคราะห์</span>
+                </button>
+                <button type="button" class="btn-sheet-secondary" onclick="window.print()" style="padding: 7px 14px; font-size: 0.85rem; border-radius: 8px;">
+                    <i data-lucide="printer" style="width: 14px; height: 14px;"></i>
+                    <span>พิมพ์รายงาน</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- Hidden Raw Text Store for Clipboard and fallback -->
+        <textarea id="aiRawTextStore" style="display: none;">{{ ai_output }}</textarea>
+
+        <!-- Formatted Rendered Output Area -->
+        <div class="ai-rendered-container" style="padding: 26px 30px;">
+            <div id="aiRenderedBody" class="ai-html-rendered-body">
+                <!-- Javascript will render marked HTML here -->
+                <div class="ai-loading-placeholder">
+                    <p style="color: #64748B;">กำลังจัดรูปแบบเนื้อหารายงาน...</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Defect Registry Table (Show only if failed items exist) -->
+    {% if failed_items and failed_items|length > 0 %}
+    <div class="content-card defect-registry-card" style="border: 1px solid #FEE2E2; border-radius: 14px; overflow: hidden; margin-bottom: 24px; background: #FFFFFF;">
+        <div style="padding: 16px 22px; background: #FEF2F2; border-bottom: 1px solid #FECACA; display: flex; align-items: center; justify-content: space-between;">
+            <div style="display: flex; align-items: center; gap: 10px;">
+                <i data-lucide="alert-triangle" style="width: 20px; height: 20px; color: #DC2626;"></i>
+                <h3 style="font-size: 1.05rem; font-weight: 700; color: #991B1B; margin: 0;">
+                    รายการข้อบกพร่องที่ตรวจพบ (Defects & Evidence Registry) — {{ failed_items|length }} รายการ
+                </h3>
+            </div>
+            <span style="font-size: 0.82rem; background: #FFFFFF; color: #DC2626; padding: 3px 10px; border-radius: 999px; font-weight: 700; border: 1px solid #FECACA;">
+                ต้องติดตามแก้ไข
+            </span>
+        </div>
+        <div class="table-responsive" style="margin: 0; padding: 0;">
+            <table class="data-table-modern" style="margin: 0; width: 100%; border-collapse: collapse;">
+                <thead style="background: #FFF5F5;">
+                    <tr>
+                        <th style="width: 70px; text-align: center; padding: 12px 14px; font-size: 0.85rem; color: #7F1D1D;">ข้อที่</th>
+                        <th style="width: 200px; padding: 12px 14px; font-size: 0.85rem; color: #7F1D1D;">หมวดการตรวจสอบ</th>
+                        <th style="min-width: 200px; padding: 12px 14px; font-size: 0.85rem; color: #7F1D1D;">หัวข้อรายการตรวจ</th>
+                        <th style="min-width: 250px; padding: 12px 14px; font-size: 0.85rem; color: #7F1D1D;">หลักฐาน/ข้อบกพร่องที่บันทึก</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for f in failed_items %}
+                    <tr style="border-bottom: 1px solid #FEE2E2;">
+                        <td style="text-align: center; font-weight: 700; color: #DC2626; padding: 12px 14px;">
+                            #{{ f.no }}
+                        </td>
+                        <td style="font-weight: 600; color: #334155; padding: 12px 14px;">
+                            {{ f.category }}
+                        </td>
+                        <td style="color: #0F172A; font-weight: 500; padding: 12px 14px;">
+                            {{ f.title }}
+                        </td>
+                        <td style="color: #DC2626; font-weight: 500; padding: 12px 14px; background: #FFFBFB;">
+                            {{ f.defect_note }}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+<!-- Marked JS Library for High-Fidelity Markdown Rendering -->
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+
+<style>
+    .ai-analysis-container {
+        max-width: 1200px;
+        margin: 0 auto;
+        padding-bottom: 40px;
+    }
+
+    /* Badges in header */
+    .badge-branch-tag {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        background: #FEF2F2;
+        color: #DC2626;
+        padding: 4px 12px;
+        border-radius: 8px;
+        font-size: 0.88rem;
+        font-weight: 700;
+        border: 1px solid #FECACA;
+    }
+
+    .badge-date-tag {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        background: #F1F5F9;
+        color: #334155;
+        padding: 4px 12px;
+        border-radius: 8px;
+        font-size: 0.88rem;
+        font-weight: 600;
+        border: 1px solid #CBD5E1;
+    }
+
+    .badge-auditor-tag {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        background: #F8FAFC;
+        color: #64748B;
+        padding: 4px 12px;
+        border-radius: 8px;
+        font-size: 0.88rem;
+        font-weight: 500;
+        border: 1px solid #E2E8F0;
+    }
+
+    /* AI Rendered Markdown Styles */
+    .ai-html-rendered-body {
+        font-size: 0.98rem;
+        line-height: 1.75;
+        color: #1E293B;
+    }
+
+    .ai-html-rendered-body h1,
+    .ai-html-rendered-body h2,
+    .ai-html-rendered-body h3,
+    .ai-html-rendered-body .ai-h3 {
+        font-size: 1.18rem;
+        font-weight: 700;
+        color: #0F172A !important;
+        margin-top: 24px;
+        margin-bottom: 12px;
+        padding-bottom: 6px;
+        border-bottom: 1px solid #F1F5F9;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .ai-html-rendered-body h1:first-child,
+    .ai-html-rendered-body h2:first-child,
+    .ai-html-rendered-body h3:first-child,
+    .ai-html-rendered-body .ai-h3:first-child {
+        margin-top: 0;
+    }
+
+    .ai-html-rendered-body p {
+        margin-bottom: 14px;
+        color: #1E293B !important;
+    }
+
+    .ai-html-rendered-body strong {
+        color: #0F172A !important;
+        font-weight: 700;
+    }
+
+    .ai-html-rendered-body ul, 
+    .ai-html-rendered-body ol {
+        margin: 8px 0 16px 20px;
+        padding-left: 8px;
+    }
+
+    .ai-html-rendered-body li {
+        margin-bottom: 8px;
+        color: #1E293B !important;
+    }
+
+    .ai-code {
+        background: #F1F5F9;
+        border: 1px solid #CBD5E1;
+        color: #DC2626;
+        padding: 2px 6px;
+        border-radius: 4px;
+        font-size: 0.9em;
+        font-family: monospace;
+    }
+
+    /* Executive Status Badges */
+    .status-pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 4px 14px;
+        border-radius: 999px;
+        font-size: 0.88rem;
+        font-weight: 700;
+        margin: 2px 0;
+    }
+
+    .status-pill.status-normal {
+        background: #ECFDF5;
+        color: #059669 !important;
+        border: 1px solid #A7F3D0;
+    }
+
+    .status-pill.status-watch {
+        background: #FEFCE8;
+        color: #D97706 !important;
+        border: 1px solid #FDE68A;
+    }
+
+    .status-pill.status-action {
+        background: #FFF7ED;
+        color: #EA580C !important;
+        border: 1px solid #FED7AA;
+    }
+
+    .status-pill.status-critical {
+        background: #FEF2F2;
+        color: #DC2626 !important;
+        border: 1px solid #FECACA;
+    }
+
+    @media print {
+        aside.app-sidebar, .header-actions, .cache-status-banner, .btn-sheet-secondary {
+            display: none !important;
+        }
+        .ai-analysis-container {
+            max-width: 100% !important;
+            padding: 0 !important;
+        }
+    }
+</style>
+
+<script>
+    function copyAiOutput() {
+        const rawStore = document.getElementById('aiRawTextStore');
+        const renderedEl = document.getElementById('aiRenderedBody');
+        const btnText = document.getElementById('copyBtnText');
+        const textToCopy = rawStore ? rawStore.value : (renderedEl ? renderedEl.innerText : '');
+        if (!textToCopy) return;
+
+        navigator.clipboard.writeText(textToCopy).then(() => {
+            if (btnText) btnText.innerText = 'คัดลอกสำเร็จ!';
+            setTimeout(() => {
+                if (btnText) btnText.innerText = 'คัดลอกบทวิเคราะห์';
+            }, 2500);
+        }).catch(err => {
+            alert('ไม่สามารถคัดลอกได้: ' + err);
+        });
+    }
+
+    function convertMarkdownToHtml(markdown) {
+        if (!markdown) return '';
+        let html = '';
+
+        if (typeof marked !== 'undefined' && (marked.parse || typeof marked === 'function')) {
+            const parseFn = marked.parse ? marked.parse : marked;
+            if (marked.setOptions) {
+                marked.setOptions({
+                    breaks: true,
+                    gfm: true
+                });
+            }
+            html = parseFn(markdown);
+        } else {
+            // Enhanced Markdown fallback
+            html = markdown
+                .replace(/^### (.*$)/gim, '<h3 class="ai-h3">$1</h3>')
+                .replace(/^## (.*$)/gim, '<h2 class="ai-h2">$1</h2>')
+                .replace(/^# (.*$)/gim, '<h1 class="ai-h1">$1</h1>')
+                .replace(/\*\*(.*?)\*\*/gim, '<strong>$1</strong>')
+                .replace(/`(.*?)`/gim, '<code class="ai-code">$1</code>')
+                .replace(/^---$/gim, '<hr class="ai-divider">')
+                .replace(/^\s*[\-\*]\s+(.*$)/gim, '<li class="ai-li">$1</li>')
+                .replace(/^\s*(\d+)\.\s+(.*$)/gim, '<li class="ai-li-num"><strong>$1.</strong> $2</li>')
+                .replace(/\n\n+/g, '</p><p>')
+                .replace(/\n/g, '<br>');
+            html = '<p>' + html + '</p>';
+        }
+
+        // Post-processing Status highlights
+        html = html.replace(/🟢\s*NORMAL/gi, '<span class="status-pill status-normal">🟢 NORMAL</span>');
+        html = html.replace(/🟡\s*WATCH/gi, '<span class="status-pill status-watch">🟡 WATCH</span>');
+        html = html.replace(/🟠\s*ACTION REQUIRED/gi, '<span class="status-pill status-action">🟠 ACTION REQUIRED</span>');
+        html = html.replace(/🔴\s*(?:ACTION REQUIRED|CRITICAL)/gi, '<span class="status-pill status-critical">🔴 ACTION REQUIRED</span>');
+
+        return html;
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+        const rawStore = document.getElementById('aiRawTextStore');
+        const renderedEl = document.getElementById('aiRenderedBody');
+        if (rawStore && renderedEl) {
+            renderedEl.innerHTML = convertMarkdownToHtml(rawStore.value);
+        }
+        if (window.lucide) {
+            lucide.createIcons();
+        }
+    });
+</script>
+{% endblock %}

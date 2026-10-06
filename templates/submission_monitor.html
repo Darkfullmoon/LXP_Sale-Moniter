@@ -1,0 +1,373 @@
+{% extends "app_layout.html" %}
+
+{% block title %}ตรวจสอบการส่งรายงานประจำวัน - LXP Sale Monitor{% endblock %}
+
+{% block breadcrumb %}
+<span class="breadcrumb-item"><a href="{{ url_for('dashboard.dashboard') }}">หน้าหลัก</a></span>
+<span class="breadcrumb-separator">/</span>
+<span class="breadcrumb-item active">ตรวจสอบการส่งรายงานประจำวัน</span>
+{% endblock %}
+
+{% block content %}
+<div class="submission-monitor-container">
+    <!-- Header Section -->
+    <div class="page-header" style="margin-bottom: 20px;">
+        <div>
+            <h1 class="page-title" style="display: flex; align-items: center; gap: 10px;">
+                <i data-lucide="calendar-clock" style="color: #DC2626; width: 28px; height: 28px;"></i>
+                ตรวจสอบการส่งรายงานประจำวัน
+            </h1>
+            <p class="page-subtitle">
+                ระบบติดตามและตรวจสอบการส่งรายงานสำนักงานขาย: รอบเช้า (ก่อน 09:15 น.) และรอบเย็น (ก่อน 17:00 น.)
+            </p>
+        </div>
+
+        <div class="header-actions" style="display: flex; gap: 10px; flex-wrap: wrap;">
+            <a href="{{ url_for('morning_audit_history') }}" class="btn-action-primary" style="background: linear-gradient(135deg, #10B981, #059669); font-size: 0.88rem;">
+                <i data-lucide="file-check-2"></i>
+                <span>ประวัติ Morning Audit</span>
+            </a>
+            <a href="{{ url_for('daily_report_history') }}" class="btn-action-primary" style="background: linear-gradient(135deg, #4F46E5, #3730A3); font-size: 0.88rem;">
+                <i data-lucide="archive"></i>
+                <span>ประวัติรายงานช่วงเย็น</span>
+            </a>
+        </div>
+    </div>
+
+    <!-- Filter Bar Card -->
+    <div class="content-card monitor-filter-card" style="margin-bottom: 24px; padding: 16px 20px;">
+        <form method="GET" action="{{ url_for('admin.admin_submission_monitor') }}" class="monitor-filter-form" id="monitorFilterForm">
+            <div class="filter-row" style="display: flex; gap: 16px; align-items: flex-end; flex-wrap: wrap;">
+                <!-- Date Picker Filter -->
+                <div class="filter-group" style="flex: 1; min-width: 220px;">
+                    <label for="dateFilterInput" style="display: block; font-size: 0.88rem; font-weight: 600; color: #334155; margin-bottom: 6px;">
+                        <i data-lucide="calendar" style="width: 15px; height: 15px; display: inline-block; vertical-align: middle; margin-right: 4px; color: #DC2626;"></i>
+                        เลือกวันที่ตรวจสอบ
+                    </label>
+                    <input type="date" id="dateFilterInput" name="date" value="{{ current_date }}" class="form-control" style="width: 100%; height: 42px; border-radius: 8px; border: 1.5px solid #CBD5E1; padding: 0 12px; font-weight: 500;" onchange="this.form.submit()">
+                </div>
+
+                <!-- Branch Filter -->
+                <div class="filter-group" style="flex: 1; min-width: 220px;">
+                    <label for="branchFilterSelect" style="display: block; font-size: 0.88rem; font-weight: 600; color: #334155; margin-bottom: 6px;">
+                        <i data-lucide="map-pin" style="width: 15px; height: 15px; display: inline-block; vertical-align: middle; margin-right: 4px; color: #DC2626;"></i>
+                        เลือกสาขา
+                    </label>
+                    <select id="branchFilterSelect" name="branch" class="form-control" style="width: 100%; height: 42px; border-radius: 8px; border: 1.5px solid #CBD5E1; padding: 0 12px; font-weight: 500;" onchange="this.form.submit()">
+                        <option value="ALL" {% if current_branch == 'ALL' %}selected{% endif %}>ทุกสาขา (ทั้งหมด)</option>
+                        {% for b in all_branches %}
+                        <option value="{{ b }}" {% if current_branch == b %}selected{% endif %}>{{ b }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <!-- Action Buttons -->
+                <div class="filter-actions" style="display: flex; gap: 8px;">
+                    <button type="button" class="btn-action-primary" onclick="setTodayAndSubmit()" style="height: 42px; background: #0F172A; padding: 0 18px; font-size: 0.88rem;" title="ดูข้อมูลวันนี้">
+                        <i data-lucide="rotate-ccw"></i>
+                        <span>วันนี้</span>
+                    </button>
+                    <button type="submit" class="btn-action-primary" style="height: 42px; padding: 0 18px; font-size: 0.88rem;">
+                        <i data-lucide="search"></i>
+                        <span>ค้นหา</span>
+                    </button>
+                </div>
+            </div>
+        </form>
+    </div>
+
+    <!-- Main Submission Matrix Table Card -->
+    <div class="content-card monitor-table-card" style="padding: 0; overflow: hidden; border-radius: 12px; box-shadow: 0 4px 16px rgba(0,0,0,0.05);">
+        <div class="card-header" style="padding: 16px 20px; border-bottom: 1px solid #E2E8F0; background: #F8FAFC; display: flex; justify-content: space-between; align-items: center;">
+            <div style="display: flex; align-items: center; gap: 8px;">
+                <i data-lucide="table" style="color: #DC2626;"></i>
+                <h3 style="font-size: 1.05rem; font-weight: 700; color: #0F172A; margin: 0;">
+                    สถานะการส่งรายงานประจำวันที่ {{ current_date }}
+                </h3>
+            </div>
+            <span style="font-size: 0.84rem; color: #64748B;">
+                แสดงข้อมูล <strong>{{ branches_status|length }}</strong> สาขา
+            </span>
+        </div>
+
+        <div class="table-responsive">
+            <table class="data-table submission-monitor-table" style="width: 100%; margin: 0; border-collapse: collapse;">
+                <thead>
+                    <tr style="background: #F1F5F9; border-bottom: 1.5px solid #CBD5E1;">
+                        <th style="padding: 14px 16px; text-align: left; font-size: 0.88rem; font-weight: 700; color: #1E293B; width: 180px;">สาขา</th>
+                        <th style="padding: 14px 16px; text-align: left; font-size: 0.88rem; font-weight: 700; color: #1E293B;">
+                            รอบเช้า: Morning Audit
+                            <span style="font-size: 0.76rem; font-weight: 500; color: #64748B; display: block;">(กำหนดส่งก่อน 09:15 น.)</span>
+                        </th>
+                        <th style="padding: 14px 16px; text-align: left; font-size: 0.88rem; font-weight: 700; color: #1E293B;">
+                            รอบเย็น: รายงานการปฏิบัติงาน
+                            <span style="font-size: 0.76rem; font-weight: 500; color: #64748B; display: block;">(กำหนดส่งก่อน 17:00 น.)</span>
+                        </th>
+                        <th style="padding: 14px 16px; text-align: center; font-size: 0.88rem; font-weight: 700; color: #1E293B; width: 150px;">ภาพรวม</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% if branches_status and branches_status|length > 0 %}
+                    {% for row in branches_status %}
+                    <tr class="monitor-row" style="border-bottom: 1px solid #E2E8F0; transition: background 0.15s ease;">
+                        <!-- Branch Name -->
+                        <td style="padding: 14px 16px; font-weight: 700; color: #0F172A; vertical-align: top;">
+                            <div style="display: flex; align-items: center; gap: 8px;">
+                                <i data-lucide="map-pin" style="width: 16px; height: 16px; color: #DC2626; flex-shrink: 0;"></i>
+                                <span>{{ row.branch }}</span>
+                            </div>
+                        </td>
+
+                        <!-- Morning Audit Status Slot -->
+                        <td style="padding: 14px 16px; vertical-align: top;">
+                            <div class="slot-container" style="display: flex; flex-direction: column; gap: 6px;">
+                                <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+                                    {% if row.morning.status == 'ON_TIME' %}
+                                    <span class="sub-badge badge-on-time">
+                                        <i data-lucide="check-circle" style="width: 14px; height: 14px;"></i> ตรงเวลา
+                                    </span>
+                                    {% elif row.morning.status == 'LATE' %}
+                                    <span class="sub-badge badge-late">
+                                        <i data-lucide="alert-triangle" style="width: 14px; height: 14px;"></i> ส่งช้า
+                                    </span>
+                                    {% elif row.morning.status == 'PENDING' %}
+                                    <span class="sub-badge badge-pending">
+                                        <i data-lucide="clock" style="width: 14px; height: 14px;"></i> รอดำเนินการ
+                                    </span>
+                                    {% else %}
+                                    <span class="sub-badge badge-missing">
+                                        <i data-lucide="x-circle" style="width: 14px; height: 14px;"></i> ยังไม่ส่ง / ขาดส่ง
+                                    </span>
+                                    {% endif %}
+
+                                    {% if row.morning.has_record %}
+                                    <a href="{{ url_for('morning_audit.morning_audit_detail', audit_id=row.morning.id) }}" class="btn-link-view" title="เปิดดูรายงาน Morning Audit">
+                                        <i data-lucide="external-link" style="width: 14px; height: 14px;"></i> ดูรายงาน
+                                    </a>
+                                    {% endif %}
+                                </div>
+
+                                {% if row.morning.has_record %}
+                                <div style="font-size: 0.8rem; color: #475569; display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+                                    <span>ผู้ส่ง: <strong>{{ row.morning.submitted_by }}</strong></span>
+                                    
+                                    <!-- Admin verification badge -->
+                                    {% if row.morning.is_verified %}
+                                    <span class="badge-admin-verified" title="ตรวจสอบโดย {{ row.morning.verified_by }} เมื่อ {{ row.morning.verified_at }}">
+                                        <i data-lucide="shield-check" style="width: 13px; height: 13px;"></i> ตรวจแล้ว ({{ row.morning.verified_by }})
+                                    </span>
+                                    {% else %}
+                                    <span class="badge-admin-unverified" title="Admin ยังไม่ได้ตรวจเช็คการแต่งกาย">
+                                        <i data-lucide="shield-alert" style="width: 13px; height: 13px;"></i> รอ Admin ตรวจ
+                                    </span>
+                                    {% endif %}
+                                </div>
+                                {% endif %}
+                            </div>
+                        </td>
+
+                        <!-- Evening Daily Report Status Slot -->
+                        <td style="padding: 14px 16px; vertical-align: top;">
+                            <div class="slot-container" style="display: flex; flex-direction: column; gap: 6px;">
+                                <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+                                    {% if row.evening.status == 'ON_TIME' %}
+                                    <span class="sub-badge badge-on-time">
+                                        <i data-lucide="check-circle" style="width: 14px; height: 14px;"></i> ตรงเวลา
+                                    </span>
+                                    {% elif row.evening.status == 'LATE' %}
+                                    <span class="sub-badge badge-late">
+                                        <i data-lucide="alert-triangle" style="width: 14px; height: 14px;"></i> ส่งช้า
+                                    </span>
+                                    {% elif row.evening.status == 'PENDING' %}
+                                    <span class="sub-badge badge-pending">
+                                        <i data-lucide="clock" style="width: 14px; height: 14px;"></i> รอดำเนินการ
+                                    </span>
+                                    {% else %}
+                                    <span class="sub-badge badge-missing">
+                                        <i data-lucide="x-circle" style="width: 14px; height: 14px;"></i> ยังไม่ส่ง / ขาดส่ง
+                                    </span>
+                                    {% endif %}
+
+                                    {% if row.evening.has_record %}
+                                    <a href="{{ url_for('daily_report.daily_report_detail', report_id=row.evening.id) }}" class="btn-link-view" title="เปิดดูรายงานช่วงเย็น">
+                                        <i data-lucide="external-link" style="width: 14px; height: 14px;"></i> ดูรายงาน
+                                    </a>
+                                    {% endif %}
+                                </div>
+
+                                {% if row.evening.has_record %}
+                                <div style="font-size: 0.8rem; color: #475569; display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+                                    <span>ผู้ส่ง: <strong>{{ row.evening.submitted_by }}</strong></span>
+                                </div>
+                                {% endif %}
+                            </div>
+                        </td>
+
+                        <!-- Overall Column -->
+                        <td style="padding: 14px 16px; text-align: center; vertical-align: middle;">
+                            {% if row.overall == 'COMPLETE_ON_TIME' %}
+                            <span class="badge-overall badge-overall-perfect">
+                                <i data-lucide="check-check"></i> ส่งครบตรงเวลา
+                            </span>
+                            {% elif row.overall == 'COMPLETE_WITH_LATE' %}
+                            <span class="badge-overall badge-overall-late">
+                                <i data-lucide="clock"></i> ส่งครบแต่มีช้า
+                            </span>
+                            {% elif row.overall == 'PENDING' %}
+                            <span class="badge-overall badge-overall-pending">
+                                <i data-lucide="loader"></i> รอดำเนินการ
+                            </span>
+                            {% else %}
+                            <span class="badge-overall badge-overall-missing">
+                                <i data-lucide="alert-circle"></i> ขาดส่งรายงาน
+                            </span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                    {% else %}
+                    <tr>
+                        <td colspan="4" style="text-align: center; padding: 40px 20px; color: #64748B;">
+                            <i data-lucide="inbox" style="width: 40px; height: 40px; margin-bottom: 10px; opacity: 0.5;"></i>
+                            <div style="font-weight: 600; font-size: 1rem;">ไม่พบข้อมูลสาขาในระบบ</div>
+                        </td>
+                    </tr>
+                    {% endif %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<script>
+    function setTodayAndSubmit() {
+        const today = new Date().toISOString().split('T')[0];
+        const dateInput = document.getElementById('dateFilterInput');
+        if (dateInput) {
+            dateInput.value = today;
+            document.getElementById('monitorFilterForm').submit();
+        }
+    }
+</script>
+
+<style>
+    /* Submission Monitor Badge Styling */
+    .sub-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        padding: 4px 10px;
+        border-radius: 6px;
+        font-size: 0.82rem;
+        font-weight: 600;
+        line-height: 1.3;
+    }
+
+    .badge-on-time {
+        background: #DCFCE7;
+        color: #15803D;
+        border: 1px solid #86EFAC;
+    }
+
+    .badge-late {
+        background: #FEF3C7;
+        color: #B45309;
+        border: 1px solid #FCD34D;
+    }
+
+    .badge-missing {
+        background: #FEE2E2;
+        color: #B91C1C;
+        border: 1px solid #FCA5A5;
+    }
+
+    .badge-pending {
+        background: #F1F5F9;
+        color: #475569;
+        border: 1px solid #CBD5E1;
+    }
+
+    .btn-link-view {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        font-size: 0.78rem;
+        font-weight: 600;
+        color: #2563EB;
+        text-decoration: none;
+        padding: 3px 8px;
+        border-radius: 4px;
+        background: rgba(37, 99, 235, 0.08);
+        transition: all 0.15s ease;
+    }
+
+    .btn-link-view:hover {
+        background: rgba(37, 99, 235, 0.18);
+        color: #1D4ED8;
+    }
+
+    .badge-admin-verified {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        font-size: 0.75rem;
+        font-weight: 600;
+        color: #047857;
+        background: #ECFDF5;
+        padding: 2px 7px;
+        border-radius: 4px;
+        border: 1px solid #A7F3D0;
+    }
+
+    .badge-admin-unverified {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        font-size: 0.75rem;
+        font-weight: 600;
+        color: #B45309;
+        background: #FFFBEB;
+        padding: 2px 7px;
+        border-radius: 4px;
+        border: 1px solid #FDE68A;
+    }
+
+    .badge-overall {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 6px 12px;
+        border-radius: 20px;
+        font-size: 0.82rem;
+        font-weight: 700;
+        white-space: nowrap;
+    }
+
+    .badge-overall-perfect {
+        background: linear-gradient(135deg, #10B981, #059669);
+        color: #FFFFFF;
+        box-shadow: 0 2px 6px rgba(16, 185, 129, 0.25);
+    }
+
+    .badge-overall-late {
+        background: linear-gradient(135deg, #F59E0B, #D97706);
+        color: #FFFFFF;
+        box-shadow: 0 2px 6px rgba(245, 158, 11, 0.25);
+    }
+
+    .badge-overall-pending {
+        background: #64748B;
+        color: #FFFFFF;
+    }
+
+    .badge-overall-missing {
+        background: linear-gradient(135deg, #EF4444, #DC2626);
+        color: #FFFFFF;
+        box-shadow: 0 2px 6px rgba(239, 68, 68, 0.25);
+    }
+
+    .monitor-row:hover {
+        background: #F8FAFC !important;
+    }
+</style>
+{% endblock %}

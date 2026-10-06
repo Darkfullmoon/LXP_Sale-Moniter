@@ -1,0 +1,318 @@
+{% extends "app_layout.html" %}
+
+{% block title %}Dashboard ภาพรวมระบบ - LXP Sale Monitor{% endblock %}
+
+{% block breadcrumb %}
+<span class="breadcrumb-item">ภาพรวมระบบ (Dashboard)</span>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1 class="page-title">ยินดีต้อนรับ, {{ current_user.username }}</h1>
+        <p class="page-subtitle">ภาพรวมสถานะการตรวจ Morning Audit, รายงานการปฏิบัติงาน และตารางการทำงานแม่บ้าน</p>
+    </div>
+    <div class="header-actions" style="display: flex; gap: 10px; flex-wrap: wrap;">
+        {% if current_user.role == 'ADMIN' %}
+        <a href="{{ url_for('morning_audit_history') }}" class="btn-action-primary"
+            style="background: linear-gradient(135deg, #8B5CF6, #6366F1); box-shadow: 0 4px 15px rgba(139, 92, 246, 0.4);">
+            <i data-lucide="sparkles"></i>
+            <span>ประวัติ Morning Audit & AI</span>
+        </a>
+        <a href="{{ url_for('daily_report_history') }}" class="btn-action-primary"
+            style="background: linear-gradient(135deg, #4F46E5, #3730A3); box-shadow: 0 4px 15px rgba(79, 70, 229, 0.35);">
+            <i data-lucide="archive"></i>
+            <span>ประวัติการปฏิบัติงาน</span>
+        </a>
+        <a href="{{ url_for('maid.maid_schedule_history') }}" class="btn-action-primary"
+            style="background: linear-gradient(135deg, #0284C7, #0369A1); box-shadow: 0 4px 15px rgba(2, 132, 199, 0.35);">
+            <i data-lucide="calendar-range"></i>
+            <span>ประวัติตารางแม่บ้าน</span>
+        </a>
+        {% else %}
+        <a href="{{ url_for('daily_report') }}" class="btn-action-primary"
+            style="background: linear-gradient(135deg, #4F46E5, #3730A3); box-shadow: 0 4px 15px rgba(79, 70, 229, 0.35);">
+            <i data-lucide="calendar-check-2"></i>
+            <span>รายงานการปฏิบัติงาน</span>
+        </a>
+        <a href="{{ url_for('morning_audit') }}" class="btn-action-primary"
+            style="background: linear-gradient(135deg, #10B981, #059669); box-shadow: 0 4px 15px rgba(16, 185, 129, 0.35);">
+            <i data-lucide="clipboard-check"></i>
+            <span>ตรวจ Morning Audit</span>
+        </a>
+        {% if current_user.branch and 'โคราช' in current_user.branch %}
+        <a href="{{ url_for('maid.maid_schedule') }}" class="btn-action-primary"
+            style="background: linear-gradient(135deg, #DC2626, #B91C1C); box-shadow: 0 4px 15px rgba(220, 38, 38, 0.35);">
+            <i data-lucide="brush"></i>
+            <span>บันทึกตารางแม่บ้าน</span>
+        </a>
+        <a href="{{ url_for('maid.maid_schedule_history') }}" class="btn-action-primary"
+            style="background: linear-gradient(135deg, #0284C7, #0369A1); box-shadow: 0 4px 15px rgba(220, 38, 38, 0.35);">
+            <i data-lucide="calendar-range"></i>
+            <span>ประวัติตารางแม่บ้าน</span>
+        </a>
+        {% endif %}
+        {% endif %}
+    </div>
+</div>
+
+{% if current_user.role == 'ADMIN' %}
+<!-- Prominent Admin AI Banner -->
+<div class="content-card ai-dashboard-banner"
+    style="margin-bottom: 24px; background: linear-gradient(135deg, rgba(99, 102, 241, 0.12) 0%, rgba(168, 85, 247, 0.12) 100%); border: 1px solid rgba(168, 85, 247, 0.3); position: relative; overflow: hidden;">
+    <div
+        style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 16px; padding: 6px 0;">
+        <div style="display: flex; align-items: center; gap: 14px;">
+            <div class="ai-avatar-icon"
+                style="background: linear-gradient(135deg, #8B5CF6, #EC4899); box-shadow: 0 0 20px rgba(168, 85, 247, 0.4); width: 44px; height: 44px;">
+                <i data-lucide="sparkles" style="color: #FFF;"></i>
+            </div>
+            <div>
+                <h3 style="font-size: 1.15rem; font-weight: 700; color: #000000 !important; margin-bottom: 3px;">
+                    AI วิเคราะห์และสรุปผล Morning Audit รายสาขา
+                </h3>
+                <p style="font-size: 0.88rem; color: #334155; margin: 0;">
+                    เข้าสู่หน้าประวัติ Morning Audit เพื่อกดดูผลวิเคราะห์เจาะลึก พร้อมระบบบันทึกผลลงฐานข้อมูลอัตโนมัติ
+                </p>
+            </div>
+        </div>
+        <a href="{{ url_for('morning_audit_history') }}" class="btn-action-primary"
+            style="background: linear-gradient(135deg, #8B5CF6, #6366F1); font-size: 0.92rem; padding: 10px 18px;">
+            <i data-lucide="arrow-right-circle"></i>
+            <span>ดูรายการ Morning Audit</span>
+        </a>
+    </div>
+</div>
+{% endif %}
+
+<div class="stats-grid" style="grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));">
+    <!-- Card 1: Morning Audit Overall -->
+    <div class="stat-card" style="border-top: 4px solid #06B6D4;">
+        <div class="stat-card-header">
+            <span class="stat-card-title">Morning Audit ทั้งหมด</span>
+            <div class="stat-card-icon" style="background: rgba(6, 182, 212, 0.2); color: #22D3EE;">
+                <i data-lucide="clipboard-check"></i>
+            </div>
+        </div>
+        <div class="stat-card-value" style="color: #22D3EE;">{{ stats.total_audits }} <span
+                style="font-size: 0.95rem; color: var(--text-dim);">รอบ</span></div>
+        <span class="stat-card-desc">คะแนนผ่านเกณฑ์เฉลี่ย <strong>{{ stats.avg_pass_rate }}%</strong></span>
+    </div>
+
+    <!-- Card 2: Daily Operation Reports -->
+    <div class="stat-card" style="border-top: 4px solid #6366F1;">
+        <div class="stat-card-header">
+            <span class="stat-card-title">รายงานการปฏิบัติงาน</span>
+            <div class="stat-card-icon" style="background: rgba(99, 102, 241, 0.2); color: #818CF8;">
+                <i data-lucide="file-spreadsheet"></i>
+            </div>
+        </div>
+        <div class="stat-card-value" style="color: #818CF8;">{{ stats.total_daily_reports }} <span
+                style="font-size: 0.95rem; color: var(--text-dim);">ฉบับ</span></div>
+        <span class="stat-card-desc">บันทึกแผนงานและสรุปประจำวัน</span>
+    </div>
+
+    <!-- Card 3: Maid Schedule Reports -->
+    {% if current_user.role == 'ADMIN' or (current_user.branch and 'โคราช' in current_user.branch) %}
+    <div class="stat-card" style="border-top: 4px solid #0284C7;">
+        <div class="stat-card-header">
+            <span class="stat-card-title">ตารางการทำงานแม่บ้าน</span>
+            <div class="stat-card-icon" style="background: rgba(2, 132, 199, 0.15); color: #0284C7;">
+                <i data-lucide="brush"></i>
+            </div>
+        </div>
+        <div class="stat-card-value" style="color: #0284C7;">{{ stats.total_maid_schedules }} <span
+                style="font-size: 0.95rem; color: var(--text-dim);">ตาราง/เดือน</span></div>
+        <span class="stat-card-desc">ตารางการทำงานแม่บ้านประจำวัน</span>
+    </div>
+    {% endif %}
+</div>
+
+<!-- Section 1: Recent Maid Schedules Table (ประวัติตารางการทำงานแม่บ้าน) -->
+{% if current_user.role == 'ADMIN' or (current_user.branch and 'โคราช' in current_user.branch) %}
+<div class="content-card" style="margin-top: 24px; margin-bottom: 24px;">
+    <div class="content-card-header">
+        <div>
+            <h2 class="content-card-title">ประวัติตารางการทำงานแม่บ้านล่าสุด</h2>
+            <p class="content-card-subtitle">ตารางการทำงานแม่บ้าน สำนักงานขายประจำวัน รายเดือน</p>
+        </div>
+        <a href="{{ url_for('maid.maid_schedule_history') }}" class="btn-link">
+            <span>ดูประวัติตารางแม่บ้านทั้งหมด</span>
+            <i data-lucide="arrow-right"></i>
+        </a>
+    </div>
+
+    <div class="table-responsive">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th style="width: 160px; padding-left: 36px;">สาขา</th>
+                    <th style="text-align: center; width: 200px;">ประจำเดือน</th>
+                    <th style="text-align: center; width: 140px;">ผู้บันทึก</th>
+                    <th style="text-align: center; width: 160px;">อัปเดตล่าสุด</th>
+                    <th style="text-align: center; width: 180px;">รายงาน</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% if recent_maid_schedules %}
+                {% for m in recent_maid_schedules %}
+                <tr>
+                    <td><span class="font-medium">{{ m.branch | format_branch }}</span></td>
+                    <td style="text-align: center;">
+                        <span class="status-badge"
+                            style="display: inline-flex; align-items: center; justify-content: center; gap: 6px; background: #EFF6FF; color: #1D4ED8; font-weight: 700; border: 1px solid #BFDBFE; padding: 4px 12px; border-radius: 20px; white-space: nowrap;">
+                            <i data-lucide="calendar" style="width: 13px; height: 13px;"></i>
+                            <span>{{ m.month_year | format_month_th }}</span>
+                        </span>
+                    </td>
+                    <td style="text-align: center;"><span class="user-pill">{{ m.submitted_by }}</span></td>
+                    <td style="text-align: center;" class="text-dim text-sm">{{ m.updated_at | format_date }}</td>
+                    <td style="text-align: center;">
+                        <div style="display: inline-flex; align-items: center; justify-content: center; gap: 8px;">
+                            <a href="{{ url_for('maid.maid_schedule_detail', schedule_id=m.id) }}"
+                                class="btn-sheet-quick"
+                                style="font-size: 0.8rem; padding: 4px 10px; white-space: nowrap; display: inline-flex; align-items: center; gap: 5px;">
+                                <i data-lucide="eye" style="width: 13px; height: 13px;"></i> <span>ดูตาราง</span>
+                            </a>
+                            <a href="{{ url_for('maid.maid_schedule_pdf', schedule_id=m.id) }}" class="btn-sheet-quick"
+                                style="font-size: 0.8rem; padding: 4px 8px; color: #DC2626; border-color: #FECACA; background: #FEF2F2; white-space: nowrap; display: inline-flex; align-items: center; gap: 4px;"
+                                title="ดาวน์โหลด PDF" target="_blank">
+                                <i data-lucide="file-text" style="width: 13px; height: 13px;"></i> <span>PDF</span>
+                            </a>
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+                {% else %}
+                <tr>
+                    <td colspan="5" class="table-empty">
+                        <i data-lucide="inbox" class="empty-icon"></i>
+                        <p>ยังไม่มีประวัติตารางการทำงานแม่บ้านในระบบ</p>
+                    </td>
+                </tr>
+                {% endif %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endif %}
+
+<!-- Section 2: Recent Morning Audits Table -->
+<div class="content-card" style="margin-bottom: 24px;">
+    <div class="content-card-header">
+        <div>
+            <h2 class="content-card-title">ประวัติ Morning Audit ล่าสุด</h2>
+            <p class="content-card-subtitle">การตรวจเช็กความพร้อมสำนักงานขาย</p>
+        </div>
+        <a href="{{ url_for('morning_audit_history') }}" class="btn-link">
+            <span>ดูประวัติ Morning Audit ทั้งหมด</span>
+            <i data-lucide="arrow-right"></i>
+        </a>
+    </div>
+
+    <div class="table-responsive">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th style="width: 160px; padding-left: 36px;">สาขา</th>
+                    <th style="text-align: center; width: 140px;">วันที่ตรวจ</th>
+                    <th style="text-align: center;">ผลการประเมิน (ผ่าน / ไม่ผ่าน)</th>
+                    <th style="text-align: center; width: 140px;">อัตราส่วนผ่าน (%)</th>
+                    <th style="text-align: center; width: 130px;">ผู้บันทึก</th>
+                    <th style="text-align: center; width: 140px;">รายงาน</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% if recent_audits %}
+                {% for a in recent_audits %}
+                <tr>
+                    <td><span class="font-medium">{{ a.branch | format_branch }}</span></td>
+                    <td style="text-align: center;" class="text-dim text-sm">{{ a.audit_date | format_date }}</td>
+                    <td style="text-align: center;">
+                        <span class="status-badge status-approved" style="white-space: nowrap;"><i
+                                data-lucide="check"></i> {{ a.passed_items }}
+                            ผ่าน</span>
+                        {% if a.failed_items > 0 %}
+                        <span class="status-badge status-rejected" style="margin-left: 4px; white-space: nowrap;"><i
+                                data-lucide="x"></i> {{
+                            a.failed_items }} ไม่ผ่าน</span>
+                        {% endif %}
+                    </td>
+                    <td style="text-align: center;">
+                        <span style="font-weight: 700; color: #10B981; font-size: 0.92rem;">{{ (a.passed_items /
+                            (a.passed_items +
+                            a.failed_items) * 100)|round(1) if (a.passed_items + a.failed_items) > 0 else 0 }}%</span>
+                    </td>
+                    <td style="text-align: center;"><span class="user-pill">{{ a.submitted_by }}</span></td>
+                    <td style="text-align: center;">
+                        <a href="{{ url_for('morning_audit_detail', audit_id=a.id) }}" class="btn-sheet-quick"
+                            style="font-size: 0.8rem; padding: 5px 12px; white-space: nowrap; display: inline-flex; align-items: center; justify-content: center; gap: 5px;">
+                            <i data-lucide="eye" style="width: 13px; height: 13px;"></i> <span>ดูฉบับเต็ม</span>
+                        </a>
+                    </td>
+                </tr>
+                {% endfor %}
+                {% else %}
+                <tr>
+                    <td colspan="6" class="table-empty">
+                        <i data-lucide="inbox" class="empty-icon"></i>
+                        <p>ยังไม่มีประวัติการตรวจ Morning Audit ในระบบ</p>
+                    </td>
+                </tr>
+                {% endif %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Section 3: Recent Daily Operation Reports Table -->
+<div class="content-card">
+    <div class="content-card-header">
+        <div>
+            <h2 class="content-card-title">ประวัติรายงานการปฏิบัติงานล่าสุด</h2>
+            <p class="content-card-subtitle">รายงานแผนงานและผลงานประจำวัน (FM-MS-224)</p>
+        </div>
+        <a href="{{ url_for('daily_report_history') }}" class="btn-link">
+            <span>ดูประวัติรายงานการปฏิบัติงานทั้งหมด</span>
+            <i data-lucide="arrow-right"></i>
+        </a>
+    </div>
+
+    <div class="table-responsive">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th style="width: 160px; padding-left: 36px;">สาขา</th>
+                    <th style="text-align: center; width: 180px;">วันที่รายงาน</th>
+                    <th style="text-align: center; width: 150px;">ผู้บันทึก</th>
+                    <th style="text-align: center; width: 160px;">รายงาน</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% if recent_dailies %}
+                {% for d in recent_dailies %}
+                <tr>
+                    <td><span class="font-medium">{{ d.branch | format_branch }}</span></td>
+                    <td style="text-align: center;" class="text-dim text-sm">{{ d.report_date | format_date }}</td>
+                    <td style="text-align: center;"><span class="user-pill">{{ d.submitted_by }}</span></td>
+                    <td style="text-align: center;">
+                        <a href="{{ url_for('daily_report_detail', report_id=d.id) }}" class="btn-sheet-quick"
+                            style="font-size: 0.8rem; padding: 5px 14px; white-space: nowrap; display: inline-flex; align-items: center; justify-content: center; gap: 5px;">
+                            <i data-lucide="eye" style="width: 13px; height: 13px;"></i> <span>ดูฉบับเต็ม</span>
+                        </a>
+                    </td>
+                </tr>
+                {% endfor %}
+                {% else %}
+                <tr>
+                    <td colspan="4" class="table-empty">
+                        <i data-lucide="inbox" class="empty-icon"></i>
+                        <p>ยังไม่มีประวัติรายงานการปฏิบัติงานในระบบ</p>
+                    </td>
+                </tr>
+                {% endif %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

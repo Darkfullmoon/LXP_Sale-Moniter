@@ -1,0 +1,606 @@
+<!DOCTYPE html>
+<html lang="th">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
+    <title>{% block title %}LXP Sale Monitor{% endblock %}</title>
+    <!-- Favicon -->
+    <link rel="icon" type="image/png" href="{{ url_for('static', filename='img/favicon.png') }}">
+    <link rel="shortcut icon" href="{{ url_for('static', filename='img/favicon.ico') }}">
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Prompt:wght@300;400;500;600&family=Sarabun:wght@300;400;500;600;700&display=swap"
+        rel="stylesheet">
+    <!-- Fast Edge CDN for Icons & Alert (Non-blocking defer) -->
+    <script src="https://cdn.jsdelivr.net/npm/lucide@0.460.0/dist/umd/lucide.min.js" defer></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11" defer></script>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}?v=8.9">
+    <style>
+        /* Guaranteed Red Sidebar & White Menu Typography */
+        aside.app-sidebar {
+            background: linear-gradient(180deg, #DC2626 0%, #B91C1C 60%, #991B1B 100%) !important;
+            border-right: none !important;
+            box-shadow: 3px 0 16px rgba(185, 28, 28, 0.25) !important;
+        }
+
+        .sidebar-brand {
+            border-bottom: 1px solid rgba(255, 255, 255, 0.18) !important;
+            background: transparent !important;
+        }
+
+        .brand-name {
+            color: #FFFFFF !important;
+            font-weight: 700 !important;
+        }
+
+        .brand-sub {
+            color: rgba(255, 255, 255, 0.85) !important;
+        }
+
+        .brand-logo-icon {
+            background: #FFFFFF !important;
+            color: #DC2626 !important;
+        }
+
+        .sidebar-user-card {
+            background: rgba(0, 0, 0, 0.16) !important;
+            border: 1px solid rgba(255, 255, 255, 0.18) !important;
+        }
+
+        .user-avatar {
+            background: #FFFFFF !important;
+            color: #DC2626 !important;
+            font-weight: 700 !important;
+        }
+
+        .user-name-title {
+            color: #FFFFFF !important;
+            font-weight: 600 !important;
+        }
+
+        .user-role-badge {
+            background: rgba(255, 255, 255, 0.22) !important;
+            color: #FFFFFF !important;
+            border: 1px solid rgba(255, 255, 255, 0.35) !important;
+        }
+
+        .nav-section-label {
+            color: #FFFFFF !important;
+            font-weight: 700 !important;
+            font-size: 0.96rem !important;
+            letter-spacing: 0.3px !important;
+            text-shadow: 0 1px 3px rgba(0, 0, 0, 0.35) !important;
+            padding: 12px 12px 4px 12px !important;
+            display: flex !important;
+            align-items: center !important;
+            opacity: 1 !important;
+        }
+
+        .nav-link {
+            color: rgba(255, 255, 255, 0.92) !important;
+            font-weight: 500 !important;
+            font-size: 0.86rem !important;
+            padding: 8px 12px 8px 18px !important;
+            margin: 2px 6px !important;
+            border-radius: 8px !important;
+            transition: all 0.18s ease !important;
+        }
+
+        .nav-link i, .nav-link .nav-icon {
+            color: rgba(255, 255, 255, 0.92) !important;
+            width: 16px !important;
+            height: 16px !important;
+        }
+
+        .nav-link:hover {
+            color: #FFFFFF !important;
+            background: rgba(255, 255, 255, 0.18) !important;
+        }
+
+        .nav-link:hover i, .nav-link:hover .nav-icon {
+            color: #FFFFFF !important;
+        }
+
+        .nav-link.active {
+            background: rgba(255, 255, 255, 0.24) !important;
+            color: #FFFFFF !important;
+            font-weight: 700 !important;
+            font-size: 0.86rem !important;
+            border: 1px solid rgba(255, 255, 255, 0.38) !important;
+            backdrop-filter: blur(8px) !important;
+            -webkit-backdrop-filter: blur(8px) !important;
+            box-shadow: 0 4px 14px rgba(0, 0, 0, 0.12), inset 0 1px 1px rgba(255, 255, 255, 0.3) !important;
+            position: relative !important;
+        }
+
+        .nav-link.active i, .nav-link.active .nav-icon, .nav-link.active span {
+            color: #FFFFFF !important;
+            text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3) !important;
+        }
+
+        .nav-link.active::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 15%;
+            height: 70%;
+            width: 4px;
+            background: #FFFFFF;
+            border-radius: 0 4px 4px 0;
+            box-shadow: 0 0 8px rgba(255, 255, 255, 0.85);
+        }
+
+        .sidebar-footer {
+            border-top: 1px solid rgba(255, 255, 255, 0.18) !important;
+        }
+
+        .sidebar-logout-btn {
+            background: rgba(0, 0, 0, 0.22) !important;
+            color: #FFFFFF !important;
+            border: 1px solid rgba(255, 255, 255, 0.25) !important;
+        }
+
+        .sidebar-logout-btn:hover {
+            background: rgba(0, 0, 0, 0.38) !important;
+            color: #FFFFFF !important;
+        }
+
+        /* Topbar Red Badge */
+        .topbar-badge.badge-admin {
+            background: #FEF2F2 !important;
+            color: #DC2626 !important;
+            border: 1px solid #FECACA !important;
+            font-weight: 700 !important;
+            padding: 3px 10px !important;
+        }
+
+        /* User Pill Black Text */
+        .user-pill {
+            background: #F1F5F9 !important;
+            color: #000000 !important;
+            font-size: 0.82rem !important;
+            font-weight: 700 !important;
+            padding: 3px 10px !important;
+            border-radius: 6px !important;
+            border: 1px solid #CBD5E1 !important;
+            display: inline-block !important;
+        }
+
+        /* Mobile View Safety & Card-View System (Screens <= 768px) */
+        @media (max-width: 768px) {
+            html, body {
+                width: 100% !important;
+                max-width: 100vw !important;
+                overflow-x: clip !important;
+            }
+
+            .app-layout {
+                width: 100% !important;
+                max-width: 100% !important;
+                overflow: visible !important;
+            }
+
+            .app-main {
+                margin-left: 0 !important;
+                width: 100% !important;
+                max-width: 100% !important;
+                overflow: visible !important;
+            }
+
+            /* Sticky Mobile Navbar - Follows screen on scroll */
+            .app-topbar {
+                position: sticky !important;
+                top: 0 !important;
+                left: 0 !important;
+                right: 0 !important;
+                z-index: 1000 !important;
+                background: rgba(255, 255, 255, 0.96) !important;
+                backdrop-filter: blur(12px) !important;
+                -webkit-backdrop-filter: blur(12px) !important;
+                border-bottom: 1px solid #E2E8F0 !important;
+                box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06) !important;
+                padding: 6px 12px !important;
+                height: 52px !important;
+                min-height: 52px !important;
+                display: flex !important;
+                align-items: center !important;
+                justify-content: space-between !important;
+                gap: 10px !important;
+                box-sizing: border-box !important;
+            }
+
+            .sidebar-toggle-btn {
+                display: inline-flex !important;
+                align-items: center !important;
+                justify-content: center !important;
+                width: 36px !important;
+                min-width: 36px !important;
+                height: 36px !important;
+                padding: 0 !important;
+                background: #F8FAFC !important;
+                border: 1.5px solid #CBD5E1 !important;
+                border-radius: 8px !important;
+                color: #0F172A !important;
+                cursor: pointer !important;
+                flex-shrink: 0 !important;
+                box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04) !important;
+            }
+
+            .sidebar-toggle-btn i,
+            .sidebar-toggle-btn svg {
+                width: 20px !important;
+                height: 20px !important;
+            }
+
+            /* Breadcrumb layout on mobile: Show current page clearly without crowding */
+            .topbar-breadcrumb {
+                flex: 1 !important;
+                min-width: 0 !important;
+                display: flex !important;
+                align-items: center !important;
+                font-size: 0.86rem !important;
+                color: #0F172A !important;
+                white-space: nowrap !important;
+                overflow: hidden !important;
+                text-overflow: ellipsis !important;
+            }
+
+            .topbar-breadcrumb .breadcrumb-separator,
+            .topbar-breadcrumb .breadcrumb-item:not(.active):not(:only-child) {
+                display: none !important;
+            }
+
+            .topbar-breadcrumb .breadcrumb-item.active,
+            .topbar-breadcrumb .breadcrumb-item:last-child {
+                display: block !important;
+                font-size: 0.86rem !important;
+                font-weight: 700 !important;
+                color: #0F172A !important;
+                white-space: nowrap !important;
+                overflow: hidden !important;
+                text-overflow: ellipsis !important;
+            }
+
+            .topbar-user-quick {
+                display: inline-flex !important;
+                align-items: center !important;
+                gap: 4px !important;
+                flex-shrink: 0 !important;
+            }
+
+            .topbar-user-quick .welcome-text {
+                display: none !important; /* Hide long prefix on mobile to avoid squeezing */
+            }
+
+            .topbar-badge {
+                font-size: 0.72rem !important;
+                font-weight: 700 !important;
+                padding: 3px 8px !important;
+                border-radius: 6px !important;
+            }
+
+            .app-content-container {
+                padding: 12px 10px 40px 10px !important;
+                overflow-x: hidden !important;
+                width: 100% !important;
+                box-sizing: border-box !important;
+            }
+
+            .page-header {
+                flex-direction: column !important;
+                align-items: flex-start !important;
+                gap: 12px !important;
+            }
+
+            .header-actions {
+                width: 100% !important;
+                display: flex !important;
+                flex-direction: column !important;
+                gap: 8px !important;
+            }
+
+            .header-actions .btn-action-primary {
+                width: 100% !important;
+                justify-content: center !important;
+                box-sizing: border-box !important;
+                padding: 10px 16px !important;
+            }
+
+            .stats-grid {
+                grid-template-columns: 1fr !important;
+                gap: 12px !important;
+            }
+
+            /* Generic Card View transform for Dashboard tables */
+            .content-card .table-responsive {
+                overflow: visible !important;
+            }
+
+            .content-card .data-table {
+                display: block !important;
+                width: 100% !important;
+                min-width: 0 !important;
+            }
+
+            .content-card .data-table thead {
+                display: none !important;
+            }
+
+            .content-card .data-table tbody {
+                display: flex !important;
+                flex-direction: column !important;
+                gap: 10px !important;
+                width: 100% !important;
+            }
+
+            .content-card .data-table tbody tr {
+                display: flex !important;
+                flex-direction: column !important;
+                background: #F8FAFC !important;
+                border: 1px solid #E2E8F0 !important;
+                border-radius: 12px !important;
+                padding: 12px 14px !important;
+                gap: 6px !important;
+                box-sizing: border-box !important;
+                width: 100% !important;
+            }
+
+            .content-card .data-table tbody td {
+                display: flex !important;
+                justify-content: space-between !important;
+                align-items: center !important;
+                padding: 2px 0 !important;
+                border: none !important;
+                width: 100% !important;
+                box-sizing: border-box !important;
+                text-align: left !important;
+            }
+
+            .content-card .data-table tbody td.table-empty {
+                display: flex !important;
+                flex-direction: column !important;
+                align-items: center !important;
+                justify-content: center !important;
+                padding: 30px 16px !important;
+            }
+        }
+    </style>
+</head>
+
+<body class="dashboard-body">
+    <div class="background-decorations">
+        <div class="glow-circle glow-1"></div>
+        <div class="glow-circle glow-2"></div>
+    </div>
+
+    <!-- App Wrapper with Sidebar -->
+    <div class="app-layout">
+        <!-- Sidebar Navigation -->
+        <aside class="app-sidebar" id="sidebar">
+            <!-- Sidebar Header / Brand -->
+            <div class="sidebar-brand">
+                <div class="brand-logo-icon">
+                    <i data-lucide="activity"></i>
+                </div>
+                <div class="brand-info">
+                    <span class="brand-name">LXP MONITOR</span>
+                    <span class="brand-sub">Sale & Inspection</span>
+                </div>
+                <button type="button" class="sidebar-close-btn" onclick="toggleSidebar(false)" aria-label="ปิดเมนู">
+                    <i data-lucide="x"></i>
+                </button>
+            </div>
+
+            <!-- Logged-in User Profile Card -->
+            <div class="sidebar-user-card">
+                <div class="user-avatar">
+                    {{ current_user.username[0] if current_user.username else 'U' }}
+                </div>
+                <div class="user-meta">
+                    <div class="user-name-title" title="{{ current_user.username }}">
+                        {{ current_user.username }}
+                    </div>
+                    <div class="user-role-badge role-{{ current_user.role|lower }}">
+                        <i data-lucide="shield" class="role-icon"></i>
+                        <span>{{ current_user.role }}</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Navigation Menu -->
+            <nav class="sidebar-nav">
+                <div class="nav-section-label">เมนูการใช้งาน (MENU)</div>
+
+                <!-- Dashboard link -->
+                <a href="{{ url_for('dashboard') }}"
+                    class="nav-link {% if request.endpoint in ['dashboard', 'index', 'dashboard.dashboard', 'dashboard.index'] %}active{% endif %}">
+                    <i data-lucide="layout-dashboard" class="nav-icon"></i>
+                    <span>ภาพรวม (Dashboard)</span>
+                </a>
+
+                {% if current_user.role == 'ADMIN' %}
+                <!-- เพิ่มสาขา (Add Branch) Sidebar Menu -->
+                <a href="{{ url_for('admin_branches') }}"
+                    class="nav-link {% if request.endpoint in ['admin_branches', 'admin.admin_branches'] %}active{% endif %}" title="จัดการและเพิ่มสาขาใหม่">
+                    <i data-lucide="map-pin" class="nav-icon"></i>
+                    <span>เพิ่มสาขา</span>
+                </a>
+
+                <!-- กำหนดสาขา (Admin) -->
+                <a href="{{ url_for('admin.admin_users') }}"
+                    class="nav-link {% if request.endpoint in ['admin_users', 'admin.admin_users'] %}active{% endif %}" title="กำหนดสาขา">
+                    <i data-lucide="users" class="nav-icon"></i>
+                    <span>กำหนดสาขา</span>
+                </a>
+
+                <!-- ADMIN MENUS -->
+                <div class="nav-section-label" style="margin-top: 15px;">ระบบจัดการ (ADMIN)</div>
+                <!-- ตรวจสอบการส่งรายงานประจำวัน (Admin) -->
+                <a href="{{ url_for('admin.admin_submission_monitor') }}"
+                    class="nav-link {% if request.endpoint in ['admin.admin_submission_monitor', 'admin_submission_monitor'] %}active{% endif %}" title="ตรวจสอบการส่งรายงานรอบเช้าและรอบเย็น">
+                    <i data-lucide="calendar-clock" class="nav-icon"></i>
+                    <span>ตรวจสอบการส่งรายงาน</span>
+                </a>
+
+                <!-- จำนวนลูกค้าประจำสัปดาห์ (Admin) -->
+                <a href="{{ url_for('admin_weekly_customers') }}"
+                    class="nav-link {% if request.endpoint in ['admin_weekly_customers', 'weekly_customers', 'admin.admin_weekly_customers'] %}active{% endif %}">
+                    <i data-lucide="calendar-range" class="nav-icon"></i>
+                    <span>จำนวนลูกค้าประจำสัปดาห์</span>
+                </a>
+
+                <!-- ประวัติการตรวจช่วงเช้า -->
+                <a href="{{ url_for('morning_audit_history') }}"
+                    class="nav-link {% if request.endpoint in ['morning_audit_history', 'morning_audit_detail', 'morning_audit_ai_analysis', 'morning_audit.morning_audit_history', 'morning_audit.morning_audit_detail', 'morning_audit.morning_audit_ai_analysis'] %}active{% endif %}">
+                    <i data-lucide="file-check-2" class="nav-icon"></i>
+                    <span>ประวัติการตรวจช่วงเช้า</span>
+                </a>
+
+                <!-- ประวัติการตรวจช่วงเย็น -->
+                <a href="{{ url_for('daily_report_history') }}"
+                    class="nav-link {% if request.endpoint in ['daily_report_history', 'daily_report_detail', 'daily_report.daily_report_history', 'daily_report.daily_report_detail'] %}active{% endif %}">
+                    <i data-lucide="archive" class="nav-icon"></i>
+                    <span>ประวัติการตรวจช่วงเย็น</span>
+                </a>
+
+                <!-- การทำงานประจำวันของแม่บ้าน (Admin) -->
+                <a href="{{ url_for('maid.maid_schedule_history') }}"
+                    class="nav-link {% if request.endpoint in ['maid_schedule_history', 'maid_schedule_detail', 'maid.maid_schedule_history', 'maid.maid_schedule_detail'] %}active{% endif %}">
+                    <i data-lucide="brush" class="nav-icon"></i>
+                    <span>การทำงานประจำวันของแม่บ้าน</span>
+                </a>
+                {% else %}
+                <!-- USER MENUS -->
+                <div class="nav-section-label" style="margin-top: 15px;">ตรวจบันทึกประจำวัน</div>
+                <a href="{{ url_for('morning_audit') }}"
+                    class="nav-link {% if request.endpoint in ['morning_audit', 'morning_audit.morning_audit'] %}active{% endif %}">
+                    <i data-lucide="clipboard-check" class="nav-icon"></i>
+                    <span>บันทึกประจำวันช่วงเช้า</span>
+                </a>
+                <a href="{{ url_for('daily_report') }}"
+                    class="nav-link {% if request.endpoint in ['daily_report', 'daily_report.daily_report'] %}active{% endif %}">
+                    <i data-lucide="calendar-check-2" class="nav-icon"></i>
+                    <span>บันทึกประจำวันช่วงเย็น</span>
+                </a>
+                {% if current_user.branch and 'โคราช' in current_user.branch %}
+                <a href="{{ url_for('maid.maid_schedule') }}"
+                    class="nav-link {% if request.endpoint in ['maid_schedule', 'maid.maid_schedule'] %}active{% endif %}">
+                    <i data-lucide="brush" class="nav-icon"></i>
+                    <span>ตารางการทำงานประจำวันของแม่บ้าน</span>
+                </a>
+                {% endif %}
+
+                <!-- USER HISTORY SECTION (Read-Only) -->
+                <div class="nav-section-label" style="margin-top: 15px;">ประวัติการส่งบันทึกประจำวัน</div>
+                <a href="{{ url_for('morning_audit_history') }}"
+                    class="nav-link {% if request.endpoint in ['morning_audit_history', 'morning_audit_detail', 'morning_audit.morning_audit_history', 'morning_audit.morning_audit_detail'] %}active{% endif %}">
+                    <i data-lucide="file-check-2" class="nav-icon"></i>
+                    <span>บันทึกประจำวันช่วงเช้า</span>
+                </a>
+                <a href="{{ url_for('daily_report_history') }}"
+                    class="nav-link {% if request.endpoint in ['daily_report_history', 'daily_report_detail', 'daily_report.daily_report_history', 'daily_report.daily_report_detail'] %}active{% endif %}">
+                    <i data-lucide="archive" class="nav-icon"></i>
+                    <span>บันทึกประจำวันช่วงเย็น</span>
+                </a>
+                {% if current_user.branch and 'โคราช' in current_user.branch %}
+                <a href="{{ url_for('maid.maid_schedule_history') }}"
+                    class="nav-link {% if request.endpoint in ['maid_schedule_history', 'maid_schedule_detail', 'maid.maid_schedule_history', 'maid.maid_schedule_detail'] %}active{% endif %}">
+                    <i data-lucide="brush" class="nav-icon"></i>
+                    <span>การทำงานประจำวันของแม่บ้าน</span>
+                </a>
+                {% endif %}
+                {% endif %}
+            </nav>
+
+            <!-- Sidebar Footer: Change Password & Logout -->
+            <div class="sidebar-footer" style="display: flex; flex-direction: column; gap: 6px;">
+                <a href="{{ url_for('change_password') }}" class="sidebar-logout-btn" style="color: var(--text-muted); border-color: var(--border-subtle);">
+                    <i data-lucide="key-round" class="logout-icon" style="color: var(--accent-primary);"></i>
+                    <span>เปลี่ยนรหัสผ่าน</span>
+                </a>
+                <a href="{{ url_for('logout') }}" class="sidebar-logout-btn">
+                    <i data-lucide="log-out" class="logout-icon"></i>
+                    <span>ออกจากระบบ</span>
+                </a>
+            </div>
+        </aside>
+
+        <!-- Main Content Area -->
+        <div class="app-main">
+            <!-- Top Navbar for Mobile Toggle & User Summary -->
+            <header class="app-topbar">
+                <button type="button" class="sidebar-toggle-btn" id="sidebarToggle" onclick="toggleSidebar()">
+                    <i data-lucide="menu"></i>
+                </button>
+
+                <div class="topbar-breadcrumb">
+                    {% block breadcrumb %}
+                    <span class="breadcrumb-item">หน้าหลัก</span>
+                    {% endblock %}
+                </div>
+
+                <div class="topbar-user-quick">
+                    <span class="welcome-text">เข้าสู่ระบบโดย:</span>
+                    <span class="topbar-badge badge-{{ current_user.role|lower }}">{{ current_user.role }}</span>
+                </div>
+            </header>
+
+            <!-- Flash Alerts inside Layout -->
+            <div class="app-content-container">
+                {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                <div class="flash-container">
+                    {% for category, message in messages %}
+                    <div class="flash-alert flash-{{ category }}">
+                        <div class="flash-icon">
+                            {% if category == 'success' %}
+                            <i data-lucide="check-circle-2"></i>
+                            {% elif category == 'error' %}
+                            <i data-lucide="alert-triangle"></i>
+                            {% elif category == 'warning' %}
+                            <i data-lucide="alert-circle"></i>
+                            {% else %}
+                            <i data-lucide="info"></i>
+                            {% endif %}
+                        </div>
+                        <div class="flash-content">{{ message }}</div>
+                        <button class="flash-close" onclick="this.parentElement.remove()">
+                            <i data-lucide="x"></i>
+                        </button>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% endif %}
+                {% endwith %}
+
+                {% block content %}{% endblock %}
+            </div>
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/main.js') }}?v=2.3"></script>
+    <script>
+        // Immediate sidebar scroll restoration
+        (function() {
+            const sidebar = document.getElementById('sidebar');
+            if (sidebar) {
+                const saved = sessionStorage.getItem('sidebar_scroll_top');
+                if (saved !== null) {
+                    sidebar.scrollTop = parseInt(saved, 10);
+                }
+            }
+        })();
+
+        document.addEventListener('DOMContentLoaded', () => {
+            if (window.lucide) {
+                lucide.createIcons();
+            }
+        });
+    </script>
+</body>
+
+</html>

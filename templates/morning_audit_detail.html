@@ -1,0 +1,771 @@
+{% extends "app_layout.html" %}
+
+{% block title %}รายงานผล Morning Audit - FM-MS-007 Rev.00{% endblock %}
+
+{% block breadcrumb %}
+<span class="breadcrumb-item"><a href="{{ url_for('dashboard') }}">หน้าหลัก</a></span>
+<span class="breadcrumb-separator">/</span>
+<span class="breadcrumb-item"><a href="{{ url_for('morning_audit_history') }}">ประวัติ Morning Audit</a></span>
+<span class="breadcrumb-separator">/</span>
+<span class="breadcrumb-item active">รายงานผล</span>
+{% endblock %}
+
+{% block content %}
+<div class="sheet-form-page-container">
+    <!-- Toolbar -->
+    <div class="sheet-toolbar-bar">
+        <div class="sheet-toolbar-left">
+            <span class="sheet-toolbar-title">
+                <i data-lucide="file-check"></i> รายงานผล Morning Audit
+            </span>
+            <span class="badge-quick-stat stat-green" style="margin-left: 12px;">ผ่าน {{ audit.passed_items }}/{{ audit.total_items }}</span>
+            {% if audit.failed_items > 0 %}
+            <span class="badge-quick-stat stat-red">ไม่ผ่าน {{ audit.failed_items }}</span>
+            {% endif %}
+        </div>
+        <div class="sheet-toolbar-right">
+            <!-- 1. Print / Preview Button -->
+            <button type="button" onclick="openPrintPreviewModal('{{ url_for('morning_audit_pdf', audit_id=audit.id) }}')" class="btn-sheet-quick" title="ดูตัวอย่างเอกสาร & สั่งพิมพ์">
+                <i data-lucide="printer"></i> พิมพ์เอกสาร
+            </button>
+            <a href="{{ url_for('morning_audit_history') }}" class="btn-sheet-secondary">
+                <i data-lucide="arrow-left"></i> กลับหน้ารายการ
+            </a>
+        </div>
+    </div>
+
+    <!-- ================= ADMIN VERIFICATION CHECKBOX BANNER ================= -->
+    <div class="admin-verification-banner" id="adminVerificationBanner" style="margin-bottom: 20px; background: #FFFFFF; border-radius: 12px; padding: 16px 20px; border: 1.5px solid {% if audit.dress_code_checked %}#86EFAC{% else %}#CBD5E1{% endif %}; box-shadow: 0 2px 8px rgba(0,0,0,0.04); display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 14px;">
+        <div style="display: flex; align-items: center; gap: 14px;">
+            <div id="adminShieldIconBox" style="width: 44px; height: 44px; border-radius: 10px; background: {% if audit.dress_code_checked %}#DCFCE7{% else %}#FEF3C7{% endif %}; color: {% if audit.dress_code_checked %}#15803D{% else %}#D97706{% endif %}; display: flex; align-items: center; justify-content: center;">
+                <i data-lucide="{% if audit.dress_code_checked %}shield-check{% else %}shield-alert{% endif %}" id="adminShieldIcon"></i>
+            </div>
+            <div>
+                <div style="font-size: 1rem; font-weight: 700; color: #0F172A;">
+                    การตรวจสอบความเรียบร้อยการแต่งกายพนักงาน
+                </div>
+                <div id="adminVerifyMetaText" style="font-size: 0.84rem; color: #64748B; margin-top: 2px;">
+                    {% if audit.dress_code_checked %}
+                    ✓ ตรวจสอบแล้วโดย <strong>{{ audit.verified_by }}</strong> เมื่อ {{ audit.verified_at.strftime('%d/%m/%Y %H:%M') if audit.verified_at else '-' }}
+                    {% else %}
+                    สถานะ: ยังไม่ได้รับการตรวจเช็คโดย Admin
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <div>
+            <span class="badge-user-verify-view" style="display: inline-flex; align-items: center; gap: 6px; padding: 7px 16px; border-radius: 8px; font-size: 0.88rem; font-weight: 600; background: {% if audit.is_verified or audit.dress_code_checked %}#DCFCE7; color: #15803D; border: 1px solid #86EFAC;{% else %}#F1F5F9; color: #64748B; border: 1px solid #CBD5E1;{% endif %}">
+                <i data-lucide="{% if audit.is_verified or audit.dress_code_checked %}shield-check{% else %}clock{% endif %}" style="width: 16px; height: 16px;"></i>
+                <span>{% if audit.is_verified or audit.dress_code_checked %}Admin ตรวจสอบแล้ว{% else %}รอ Admin ตรวจสอบ{% endif %}</span>
+            </span>
+        </div>
+    </div>
+
+    <!-- Official White Sheet Paper -->
+    <div class="sheet-paper-container" id="printableSheet">
+        <!-- HEADER SECTION -->
+        <div class="sheet-header-section sheet-header-centered">
+            <div class="sheet-title-centered">
+                <strong>รายงาน Morning Audit สำนักงานขาย (ประจำวัน)</strong>
+            </div>
+
+            <div class="sheet-center-fields">
+                <div class="sheet-meta-field">
+                    <span class="sheet-field-label">สาขา</span>
+                    <span style="border-bottom: 1.5px dotted #000; padding: 2px 14px; font-weight: 700; color: #1E3A8A;">{{ audit.branch | format_branch }}</span>
+                    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+                    <span class="sheet-field-label">วันที่ตรวจ</span>
+                    <span style="border-bottom: 1.5px dotted #000; padding: 2px 14px; font-weight: 700; color: #1E3A8A;">{{ audit.audit_date | format_date }}</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- TABLE WITH SHARP BORDERS -->
+        <div class="sheet-table-wrapper">
+            <table class="audit-sheet-table">
+                <thead>
+                    <tr class="table-head-main-row">
+                        <th rowspan="2" class="col-no-head">No</th>
+                        <th rowspan="2" class="col-desc-head">รายการที่ต้องพร้อมสำหรับการต้อนรับลูกค้าและเปิดสำนักงานขาย</th>
+                        <th colspan="2" class="col-result-head">ผลการตรวจ</th>
+                        <th rowspan="2" class="col-evidence-head">บันทึกข้อสังเกต / สิ่งที่ไม่เป็นไปตามมาตรฐาน / evidence / หลักฐาน</th>
+                    </tr>
+                    <tr class="table-head-sub-row">
+                        <th class="col-pass-head">ผ่าน</th>
+                        <th class="col-fail-head">ไม่ผ่าน</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for category in audit_data %}
+                    <tr class="category-header-row">
+                        <td class="cat-no-cell"></td>
+                        <td colspan="4" class="cat-title-cell">
+                            <strong>{{ category.category_title }}</strong>
+                        </td>
+                    </tr>
+
+                    {% for item in category.audit_items %}
+                    <tr class="audit-item-row {% if item.status == 'PASS' %}row-passed{% else %}row-failed{% endif %}">
+                        <td class="col-no-cell">{{ item.no }}</td>
+                        <td class="col-desc-cell">{{ item.title }}</td>
+                        
+                        <!-- Pass Column -->
+                        <td class="col-check-cell col-pass-cell">
+                            <div class="custom-sheet-check check-pass {% if item.status == 'PASS' %}checked{% endif %}">
+                                {% if item.status == 'PASS' %}
+                                <i data-lucide="check" class="mark-icon" style="display: block;"></i>
+                                {% endif %}
+                            </div>
+                            <span class="detail-status-text text-pass"> ผ่าน</span>
+                        </td>
+
+                        <!-- Fail Column -->
+                        <td class="col-check-cell col-fail-cell">
+                            <div class="custom-sheet-check check-fail {% if item.status == 'FAIL' %}checked{% endif %}">
+                                {% if item.status == 'FAIL' %}
+                                <i data-lucide="x" class="mark-icon" style="display: block;"></i>
+                                {% endif %}
+                            </div>
+                            <span class="detail-status-text text-fail"> ไม่ผ่าน</span>
+                        </td>
+
+                        <!-- Evidence Column -->
+                        <td class="col-evidence-cell {% if item.status == 'PASS' %}cell-grayed-out{% endif %}">
+                            {% if item.status == 'PASS' %}
+                            <div class="evidence-passed-overlay" style="display: flex;">
+                                <span>(ผ่านเกณฑ์มาตรฐาน)</span>
+                            </div>
+                            {% else %}
+                            <div class="evidence-inline-content">
+                                {% for field in item.evidence_fields %}
+                                    <span style="font-weight: 500;">{{ field.label }}:</span>
+                                    <span style="border-bottom: 1.5px dotted #DC2626; color: #DC2626; font-weight: 600; padding: 0 6px;">
+                                        {{ item.evidence.get(field.name) if item.evidence.get(field.name) else '-' }}
+                                    </span>
+                                    &nbsp;&nbsp;
+                                {% endfor %}
+                            </div>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <!-- BOTTOM NOTE -->
+        <div class="sheet-bottom-note-box" style="margin-top: 14px; border: 1px solid #CBD5E1; border-radius: 8px; padding: 12px 16px; background: #FFFFFF;">
+            <div class="bottom-note-label" style="text-align: left; font-size: 0.92rem; color: #0F172A; margin-bottom: 8px;">
+                <strong>หมายเหตุ : กรณีห้องวัสดุไม่ครบ/ไม่เรียบร้อย (หมวดที่ 4.) โปรดอธิบาย</strong>
+            </div>
+            <div style="min-height: 54px; border: 1px solid #E2E8F0; border-radius: 6px; padding: 10px 12px; color: #1E293B; font-size: 0.92rem; text-align: left; vertical-align: top; display: block; white-space: pre-line; word-break: break-word; background: #F8FAFC; line-height: 1.5;">{{ audit.material_room_note.strip() if (audit.material_room_note and audit.material_room_note.strip()) else '-' }}</div>
+            <div class="sheet-rev-code-right" style="margin-top: 8px; text-align: right; font-size: 0.85rem; font-weight: 700; color: #475569;">
+                <span>FM-MS-007 Rev.00</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- ================= AI STAFF PHOTO & HEADCOUNT ANALYSIS CARD ================= -->
+    <div class="content-card ai-staff-analysis-card" style="margin-top: 24px; border-radius: 12px; border: 1.5px solid #E0E7FF; background: linear-gradient(180deg, #FFFFFF 0%, #F8FAFC 100%); box-shadow: 0 4px 16px rgba(99, 102, 241, 0.08); overflow: hidden;">
+        <div class="card-header" style="padding: 16px 20px; background: linear-gradient(135deg, rgba(99, 102, 241, 0.08) 0%, rgba(168, 85, 247, 0.08) 100%); border-bottom: 1px solid #E0E7FF; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
+            <div style="display: flex; align-items: center; gap: 10px;">
+                <div style="width: 36px; height: 36px; border-radius: 8px; background: linear-gradient(135deg, #6366F1, #8B5CF6); color: #FFFFFF; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 8px rgba(99, 102, 241, 0.3);">
+                    <i data-lucide="sparkles"></i>
+                </div>
+                <div>
+                    <h3 style="font-size: 1.05rem; font-weight: 700; color: #1E1B4B; margin: 0;">
+                        AI วิเคราะห์รูปภาพพนักงานและการแต่งกาย
+                    </h3>
+                    <p style="font-size: 0.8rem; color: #475569; margin: 0;">
+                        ตรวจนับจำนวนบุคคลในภาพถ่าย เปรียบเทียบกับจำนวนที่บันทึกในรายงาน และตรวจความเรียบร้อยของเครื่องแบบ
+                    </p>
+                </div>
+            </div>
+
+            <button type="button" id="btnRunAiStaff" onclick="runMorningAuditAiStaffAnalysis({{ audit.id }})" class="btn-action-primary" style="background: linear-gradient(135deg, #6366F1, #4F46E5); font-size: 0.88rem; padding: 8px 16px; border-radius: 8px;">
+                <i data-lucide="scan-face" id="aiStaffIcon"></i>
+                <span id="aiStaffBtnText">{% if ai_staff_analysis %}วิเคราะห์ซ้ำอีกครั้ง{% else %}รัน AI วิเคราะห์ภาพพนักงาน{% endif %}</span>
+            </button>
+        </div>
+
+        <div class="card-body" id="aiStaffAnalysisBody" style="padding: 20px;">
+            {% if ai_staff_analysis %}
+            <div class="ai-staff-results-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px; margin-bottom: 16px;">
+                <!-- Result 1: Detected vs Reported Count -->
+                <div style="background: #FFFFFF; border-radius: 10px; border: 1.5px solid {% if ai_staff_analysis.is_count_matched %}#86EFAC{% else %}#FCA5A5{% endif %}; padding: 14px 16px;">
+                    <div style="font-size: 0.82rem; font-weight: 600; color: #64748B; margin-bottom: 4px;">จำนวนพนักงานในภาพ</div>
+                    <div style="display: flex; align-items: baseline; gap: 8px;">
+                        <span style="font-size: 1.6rem; font-weight: 800; color: #0F172A;">{{ ai_staff_analysis.detected_count }}</span>
+                        <span style="font-size: 0.85rem; color: #64748B;">คน</span>
+                    </div>
+                    <div style="margin-top: 6px;">
+                        {% if ai_staff_analysis.is_count_matched %}
+                        <span style="display: inline-flex; align-items: center; gap: 4px; font-size: 0.78rem; font-weight: 700; color: #15803D; background: #DCFCE7; padding: 2px 8px; border-radius: 4px;">
+                            <i data-lucide="check-circle" style="width: 12px; height: 12px;"></i> จำนวนตรงกันถูกต้อง
+                        </span>
+                        {% else %}
+                        <span style="display: inline-flex; align-items: center; gap: 4px; font-size: 0.78rem; font-weight: 700; color: #B91C1C; background: #FEE2E2; padding: 2px 8px; border-radius: 4px;">
+                            <i data-lucide="alert-circle" style="width: 12px; height: 12px;"></i> จำนวนไม่ตรงกับที่ระบุ
+                        </span>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <!-- Result 2: Dress Code & Uniform -->
+                <div style="background: #FFFFFF; border-radius: 10px; border: 1.5px solid #CBD5E1; padding: 14px 16px;">
+                    <div style="font-size: 0.82rem; font-weight: 600; color: #64748B; margin-bottom: 4px;">การแต่งกายและความเรียบร้อย</div>
+                    <div style="font-size: 1rem; font-weight: 700; color: #0F172A; margin-bottom: 6px;">
+                        {{ ai_staff_analysis.dress_code_summary or 'พนักงานแต่งกายเรียบร้อยตามมาตรฐาน' }}
+                    </div>
+                    <span style="display: inline-flex; align-items: center; gap: 4px; font-size: 0.78rem; font-weight: 700; color: #4338CA; background: #EEF2FF; padding: 2px 8px; border-radius: 4px;">
+                        <i data-lucide="shirt" style="width: 12px; height: 12px;"></i> ยูนิฟอร์มบริษัทถูกต้อง
+                    </span>
+                </div>
+            </div>
+
+            <!-- Observations List -->
+            {% if ai_staff_analysis.observations %}
+            <div style="background: #FFFFFF; border-radius: 10px; border: 1px solid #E2E8F0; padding: 14px 16px;">
+                <div style="font-size: 0.86rem; font-weight: 700; color: #1E293B; margin-bottom: 8px; display: flex; align-items: center; gap: 6px;">
+                    <i data-lucide="clipboard-list" style="width: 15px; height: 15px; color: #6366F1;"></i>
+                    <span>ข้อสังเกตเพิ่มเติมจากการวิเคราะห์ภาพถ่าย:</span>
+                </div>
+                <ul style="margin: 0; padding-left: 20px; font-size: 0.88rem; color: #334155; line-height: 1.6;">
+                    {% for obs in ai_staff_analysis.observations %}
+                    <li>{{ obs }}</li>
+                    {% endfor %}
+                </ul>
+            </div>
+            {% endif %}
+
+            {% else %}
+            <div style="text-align: center; padding: 26px 16px; color: #64748B;">
+                <i data-lucide="user-check" style="width: 44px; height: 44px; margin-bottom: 10px; opacity: 0.6; color: #6366F1;"></i>
+                <div style="font-size: 0.95rem; font-weight: 600; color: #1E293B; margin-bottom: 4px;">ยังไม่ได้ทำการวิเคราะห์ภาพพนักงานด้วย AI</div>
+                <div style="font-size: 0.84rem; color: #64748B; max-width: 460px; margin: 0 auto 14px auto;">
+                    กดปุ่ม <strong>"รัน AI วิเคราะห์ภาพพนักงาน"</strong> เพื่อตรวจนับจำนวนคนในภาพและตรวจสอบเครื่องแบบพนักงานอัตโนมัติ
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- ================= ATTACHED REPORT PHOTOS SECTION (ADMIN & USER VIEW) ================= -->
+    <div class="detail-photos-section-card">
+        <div class="detail-photos-header">
+            <div class="detail-photos-title">
+                <i data-lucide="images"></i>
+                <span>รูปถ่ายรายงาน Morning Audit</span>
+            </div>
+            <span class="detail-photos-badge">
+                {% if audit_photos and audit_photos|length > 0 %}
+                {{ audit_photos|length }} รูป
+                {% else %}
+                ไม่มีรูปถ่าย
+                {% endif %}
+            </span>
+        </div>
+        <div class="detail-photos-body">
+            {% if audit_photos and audit_photos|length > 0 %}
+            <div class="detail-photos-grid">
+                {% for photo_url in audit_photos %}
+                <div class="detail-photo-item" onclick="openDetailLightbox({{ loop.index0 }})">
+                    <div class="detail-photo-thumb-box">
+                        <img src="{{ photo_url }}" alt="รูปถ่ายรายงาน #{{ loop.index }}" class="detail-photo-thumb" loading="lazy">
+                        <span class="detail-photo-badge-idx">รูปที่ {{ loop.index }}</span>
+                        <div class="detail-photo-hover-overlay">
+                            <i data-lucide="zoom-in"></i>
+                            <span>กดเพื่อดูภาพขนาดใหญ่</span>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <div class="detail-photos-empty">
+                <i data-lucide="image-off"></i>
+                <span>ไม่มีรูปถ่ายแนบมากับรายงานฉบับนี้</span>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- ================= IN-WEBSITE IMAGE LIGHTBOX MODAL (NO NEW TAB) ================= -->
+<div class="inpage-lightbox-overlay" id="inpageLightboxModal" style="display: none;">
+    <div class="lightbox-top-toolbar">
+        <div class="lightbox-title-info">
+            <i data-lucide="image"></i> <span id="lightboxPhotoTitle">รูปถ่ายรายงาน</span>
+            <span class="lightbox-counter-badge" id="lightboxCounterBadge">1 / 1</span>
+        </div>
+        <div class="lightbox-actions-right">
+            <button type="button" class="lightbox-btn-action" id="lightboxZoomIn" title="ซูมเข้า">
+                <i data-lucide="zoom-in"></i>
+            </button>
+            <button type="button" class="lightbox-btn-action" id="lightboxZoomOut" title="ซูมออก">
+                <i data-lucide="zoom-out"></i>
+            </button>
+            <button type="button" class="lightbox-btn-action" id="lightboxResetZoom" title="รีเซ็ตขนาด">
+                <i data-lucide="maximize-2"></i>
+            </button>
+            <button type="button" class="lightbox-btn-close" id="lightboxCloseBtn" title="ปิดหน้าต่าง">
+                <i data-lucide="x"></i>
+            </button>
+        </div>
+    </div>
+    <div class="lightbox-body">
+        <button type="button" class="lightbox-nav-btn prev" id="lightboxPrevBtn" title="รูปก่อนหน้า">
+            <i data-lucide="chevron-left"></i>
+        </button>
+        <div class="lightbox-image-wrapper" id="lightboxImageWrapper">
+            <img src="" alt="รูปถ่ายรายงาน" id="lightboxImage" class="lightbox-main-img">
+        </div>
+        <button type="button" class="lightbox-nav-btn next" id="lightboxNextBtn" title="รูปถัดไป">
+            <i data-lucide="chevron-right"></i>
+        </button>
+    </div>
+</div>
+
+<script>
+    // In-Website Lightbox Logic for Detail Page
+    const detailPhotosList = {{ audit_photos|tojson if audit_photos else '[]' }};
+    let detailLightboxIndex = 0;
+    let detailLightboxZoom = 1.0;
+
+    const inpageLightboxModal = document.getElementById('inpageLightboxModal');
+    const lightboxImage = document.getElementById('lightboxImage');
+    const lightboxPhotoTitle = document.getElementById('lightboxPhotoTitle');
+    const lightboxCounterBadge = document.getElementById('lightboxCounterBadge');
+    const lightboxPrevBtn = document.getElementById('lightboxPrevBtn');
+    const lightboxNextBtn = document.getElementById('lightboxNextBtn');
+    const lightboxCloseBtn = document.getElementById('lightboxCloseBtn');
+    const lightboxZoomIn = document.getElementById('lightboxZoomIn');
+    const lightboxZoomOut = document.getElementById('lightboxZoomOut');
+    const lightboxResetZoom = document.getElementById('lightboxResetZoom');
+
+    function openDetailLightbox(index) {
+        if (!detailPhotosList || index < 0 || index >= detailPhotosList.length) return;
+        detailLightboxIndex = index;
+        detailLightboxZoom = 1.0;
+        updateDetailLightbox();
+        inpageLightboxModal.style.display = 'flex';
+    }
+
+    function closeDetailLightbox() {
+        inpageLightboxModal.style.display = 'none';
+        detailLightboxZoom = 1.0;
+    }
+
+    function updateDetailLightbox() {
+        if (!detailPhotosList[detailLightboxIndex]) return;
+        lightboxImage.src = detailPhotosList[detailLightboxIndex];
+        lightboxImage.style.transform = `scale(${detailLightboxZoom})`;
+        lightboxPhotoTitle.textContent = `รูปถ่ายรายงาน #${detailLightboxIndex + 1}`;
+        lightboxCounterBadge.textContent = `${detailLightboxIndex + 1} / ${detailPhotosList.length}`;
+
+        lightboxPrevBtn.style.display = (detailPhotosList.length > 1) ? 'flex' : 'none';
+        lightboxNextBtn.style.display = (detailPhotosList.length > 1) ? 'flex' : 'none';
+    }
+
+    if (lightboxCloseBtn) lightboxCloseBtn.addEventListener('click', closeDetailLightbox);
+    if (lightboxPrevBtn) {
+        lightboxPrevBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            detailLightboxIndex = (detailLightboxIndex - 1 + detailPhotosList.length) % detailPhotosList.length;
+            detailLightboxZoom = 1.0;
+            updateDetailLightbox();
+        });
+    }
+    if (lightboxNextBtn) {
+        lightboxNextBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            detailLightboxIndex = (detailLightboxIndex + 1) % detailPhotosList.length;
+            detailLightboxZoom = 1.0;
+            updateDetailLightbox();
+        });
+    }
+    if (lightboxZoomIn) {
+        lightboxZoomIn.addEventListener('click', () => {
+            detailLightboxZoom = Math.min(detailLightboxZoom + 0.3, 3.0);
+            lightboxImage.style.transform = `scale(${detailLightboxZoom})`;
+        });
+    }
+    if (lightboxZoomOut) {
+        lightboxZoomOut.addEventListener('click', () => {
+            detailLightboxZoom = Math.max(detailLightboxZoom - 0.3, 0.5);
+            lightboxImage.style.transform = `scale(${detailLightboxZoom})`;
+        });
+    }
+    if (lightboxResetZoom) {
+        lightboxResetZoom.addEventListener('click', () => {
+            detailLightboxZoom = 1.0;
+            lightboxImage.style.transform = `scale(${detailLightboxZoom})`;
+        });
+    }
+
+    // Keyboard Shortcuts for Lightbox
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && inpageLightboxModal && inpageLightboxModal.style.display === 'flex') {
+            closeDetailLightbox();
+        } else if (e.key === 'ArrowLeft' && inpageLightboxModal && inpageLightboxModal.style.display === 'flex' && detailPhotosList.length > 1) {
+            detailLightboxIndex = (detailLightboxIndex - 1 + detailPhotosList.length) % detailPhotosList.length;
+            detailLightboxZoom = 1.0;
+            updateDetailLightbox();
+        } else if (e.key === 'ArrowRight' && inpageLightboxModal && inpageLightboxModal.style.display === 'flex' && detailPhotosList.length > 1) {
+            detailLightboxIndex = (detailLightboxIndex + 1) % detailPhotosList.length;
+            detailLightboxZoom = 1.0;
+            updateDetailLightbox();
+        }
+    });
+
+
+
+    // ================= AI STAFF HEADCOUNT & DRESS CODE ANALYSIS AJAX =================
+    async function runMorningAuditAiStaffAnalysis(auditId, isRefresh = true) {
+        const btn = document.getElementById('btnRunAiStaff');
+        const btnText = document.getElementById('aiStaffBtnText');
+        const icon = document.getElementById('aiStaffIcon');
+        const body = document.getElementById('aiStaffAnalysisBody');
+        const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+
+        if (btn) btn.disabled = true;
+        if (btnText) btnText.textContent = isRefresh ? 'AI กำลังวิเคราะห์รูปภาพใหม่...' : 'กำลังโหลดผลวิเคราะห์...';
+        if (icon) icon.setAttribute('data-lucide', 'loader-2');
+        if (window.lucide) lucide.createIcons();
+
+        try {
+            const resp = await fetch(`/morning-audit/${auditId}/ai-staff-analysis`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': csrfToken
+                },
+                body: JSON.stringify({ refresh: isRefresh })
+            });
+            const data = await resp.json();
+
+            if (data.success && data.analysis) {
+                const a = data.analysis;
+                const isMatched = a.is_count_matched;
+                const matchBadge = isMatched
+                    ? '<span style="display: inline-flex; align-items: center; gap: 4px; font-size: 0.78rem; font-weight: 700; color: #15803D; background: #DCFCE7; padding: 2px 8px; border-radius: 4px;"><i data-lucide="check-circle" style="width: 12px; height: 12px;"></i> จำนวนตรงกันถูกต้อง</span>'
+                    : '<span style="display: inline-flex; align-items: center; gap: 4px; font-size: 0.78rem; font-weight: 700; color: #B91C1C; background: #FEE2E2; padding: 2px 8px; border-radius: 4px;"><i data-lucide="alert-circle" style="width: 12px; height: 12px;"></i> จำนวนไม่ตรงกับที่ระบุ</span>';
+
+                let obsHtml = '';
+                if (a.observations && a.observations.length > 0) {
+                    obsHtml = `
+                    <div style="background: #FFFFFF; border-radius: 10px; border: 1px solid #E2E8F0; padding: 14px 16px; margin-top: 14px;">
+                        <div style="font-size: 0.86rem; font-weight: 700; color: #1E293B; margin-bottom: 8px; display: flex; align-items: center; gap: 6px;">
+                            <i data-lucide="clipboard-list" style="width: 15px; height: 15px; color: #6366F1;"></i>
+                            <span>ข้อสังเกตเพิ่มเติมจากการวิเคราะห์ภาพถ่าย:</span>
+                        </div>
+                        <ul style="margin: 0; padding-left: 20px; font-size: 0.88rem; color: #334155; line-height: 1.6;">
+                            ${a.observations.map(o => `<li>${o}</li>`).join('')}
+                        </ul>
+                    </div>`;
+                }
+
+                body.innerHTML = `
+                <div class="ai-staff-results-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px; margin-bottom: 16px;">
+                    <div style="background: #FFFFFF; border-radius: 10px; border: 1.5px solid ${isMatched ? '#86EFAC' : '#FCA5A5'}; padding: 14px 16px;">
+                        <div style="font-size: 0.82rem; font-weight: 600; color: #64748B; margin-bottom: 4px;">จำนวนพนักงานในภาพ</div>
+                        <div style="display: flex; align-items: baseline; gap: 8px;">
+                            <span style="font-size: 1.6rem; font-weight: 800; color: #0F172A;">${a.detected_count}</span>
+                            <span style="font-size: 0.85rem; color: #64748B;">คน</span>
+                        </div>
+                        <div style="margin-top: 6px;">${matchBadge}</div>
+                    </div>
+
+                    <div style="background: #FFFFFF; border-radius: 10px; border: 1.5px solid #CBD5E1; padding: 14px 16px;">
+                        <div style="font-size: 0.82rem; font-weight: 600; color: #64748B; margin-bottom: 4px;">การแต่งกายและความเรียบร้อย</div>
+                        <div style="font-size: 1rem; font-weight: 700; color: #0F172A; margin-bottom: 6px;">
+                            ${a.dress_code_summary || 'พนักงานแต่งกายเรียบร้อยตามมาตรฐาน'}
+                        </div>
+                        <span style="display: inline-flex; align-items: center; gap: 4px; font-size: 0.78rem; font-weight: 700; color: #4338CA; background: #EEF2FF; padding: 2px 8px; border-radius: 4px;">
+                            <i data-lucide="shirt" style="width: 12px; height: 12px;"></i> ยูนิฟอร์มบริษัทถูกต้อง
+                        </span>
+                    </div>
+                </div>
+                ${obsHtml}`;
+
+                if (window.lucide) lucide.createIcons();
+
+                Swal.fire({
+                    icon: 'success',
+                    title: data.is_cached ? 'แสดงผลวิเคราะห์เดิม' : 'วิเคราะห์ภาพถ่ายสำเร็จ',
+                    text: `AI ตรวจพบพนักงาน ${a.detected_count} คน (${isMatched ? 'ตรงกับรายงาน' : 'ไม่ตรงกับรายงาน'})`,
+                    timer: 2200,
+                    showConfirmButton: false,
+                    toast: true,
+                    position: 'top-end'
+                });
+            } else {
+                Swal.fire({
+                    icon: 'error',
+                    title: 'การวิเคราะห์ไม่สำเร็จ',
+                    text: data.error || 'เกิดข้อผิดพลาดในการประมวลผล'
+                });
+            }
+        } catch (err) {
+            Swal.fire({
+                icon: 'error',
+                title: 'การเชื่อมต่อผิดพลาด',
+                text: err.message
+            });
+        } finally {
+            if (btn) btn.disabled = false;
+            if (btnText) btnText.textContent = 'วิเคราะห์ซ้ำอีกครั้ง';
+            if (icon) icon.setAttribute('data-lucide', 'scan-face');
+            if (window.lucide) lucide.createIcons();
+        }
+    }
+</script>
+
+<!-- ================= IN-PAGE PRINT PREVIEW & EXPORT MODAL ================= -->
+<div class="print-modal-overlay" id="printPreviewModal" onclick="closePrintPreviewOnBackdrop(event)">
+    <div class="print-modal-dialog">
+        <div class="print-modal-header">
+            <div class="print-modal-title">
+                <i data-lucide="printer"></i>
+                <span>ตัวอย่างเอกสารก่อนพิมพ์ (Document Preview) - Morning Audit</span>
+            </div>
+            <div class="print-modal-actions">
+                <!-- Export to PDF Button inside Modal -->
+                <a href="{{ url_for('morning_audit_pdf', audit_id=audit.id, export=1) }}" class="btn-modal-export-pdf" title="ดาวน์โหลดไฟล์ PDF คุณภาพสูง (THSarabun)">
+                    <i data-lucide="download"></i> Export เป็น PDF
+                </a>
+                <!-- Direct Print Button inside Modal -->
+                <button type="button" class="btn-modal-print" onclick="triggerDocumentPrint()" title="สั่งพิมพ์เอกสาร">
+                    <i data-lucide="printer"></i> สั่งพิมพ์
+                </button>
+                <!-- Close Button -->
+                <button type="button" class="btn-modal-close" onclick="closePrintPreviewModal()" title="ปิดหน้าต่าง (Esc)">
+                    <i data-lucide="x"></i> ปิด
+                </button>
+            </div>
+        </div>
+        <div class="print-modal-body" id="printModalBody">
+            <iframe id="printPdfPreviewIframe" class="print-preview-iframe" src="about:blank"></iframe>
+        </div>
+    </div>
+</div>
+
+<style>
+/* ================= ACTION BUTTONS & MODAL STYLES ================= */
+/* Modal Styling */
+.print-modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: rgba(15, 23, 42, 0.75);
+    backdrop-filter: blur(5px);
+    z-index: 99999;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    box-sizing: border-box;
+}
+
+.print-modal-overlay.active {
+    display: flex !important;
+}
+
+.print-modal-dialog {
+    background: #0F172A;
+    border-radius: 14px;
+    width: 100%;
+    max-width: 1060px;
+    height: 90vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+    border: 1px solid #334155;
+}
+
+.print-modal-header {
+    background: #0F172A;
+    color: #FFFFFF;
+    padding: 12px 20px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 14px;
+    flex-wrap: wrap;
+    border-bottom: 1px solid #334155;
+}
+
+.print-modal-title {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 1.02rem;
+    font-weight: 700;
+}
+
+.print-modal-title i, .print-modal-title svg {
+    width: 20px;
+    height: 20px;
+    color: #38BDF8;
+}
+
+.print-modal-actions {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.btn-modal-export-pdf {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: linear-gradient(135deg, #2563EB 0%, #1D4ED8 100%);
+    color: #FFFFFF;
+    border: none;
+    padding: 7px 16px;
+    border-radius: 8px;
+    font-size: 0.88rem;
+    font-weight: 700;
+    text-decoration: none;
+    cursor: pointer;
+    box-shadow: 0 2px 8px rgba(37, 99, 235, 0.3);
+    transition: all 0.2s ease;
+}
+
+.btn-modal-export-pdf:hover {
+    background: #1D4ED8;
+    transform: translateY(-1px);
+    color: #FFFFFF;
+}
+
+.btn-modal-print {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: #DC2626;
+    color: #FFFFFF;
+    border: none;
+    padding: 7px 18px;
+    border-radius: 8px;
+    font-size: 0.88rem;
+    font-weight: 700;
+    cursor: pointer;
+    box-shadow: 0 2px 8px rgba(220, 38, 38, 0.3);
+    transition: all 0.2s ease;
+}
+
+.btn-modal-print:hover {
+    background: #B91C1C;
+    transform: translateY(-1px);
+}
+
+.btn-modal-close {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    background: rgba(255, 255, 255, 0.12);
+    color: #FFFFFF;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    padding: 7px 14px;
+    border-radius: 8px;
+    font-size: 0.88rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.btn-modal-close:hover {
+    background: rgba(255, 255, 255, 0.22);
+}
+
+.print-modal-body {
+    padding: 0;
+    flex: 1;
+    overflow: hidden;
+    background: #475569;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.print-preview-iframe {
+    width: 100%;
+    height: 100%;
+    border: none;
+    background: #FFFFFF;
+}
+</style>
+
+<script>
+    function openPrintPreviewModal(pdfUrl) {
+        const modal = document.getElementById('printPreviewModal');
+        if (!modal) return;
+        
+        const iframe = document.getElementById('printPdfPreviewIframe');
+        if (iframe && pdfUrl) {
+            if (!iframe.src || iframe.src === 'about:blank' || !iframe.src.includes(pdfUrl)) {
+                iframe.src = pdfUrl + '#view=FitH';
+            }
+        }
+        
+        modal.style.display = 'flex';
+        modal.classList.add('active');
+        document.body.style.overflow = 'hidden';
+        
+        if (window.lucide) {
+            lucide.createIcons();
+        }
+    }
+
+    function closePrintPreviewModal() {
+        const modal = document.getElementById('printPreviewModal');
+        if (modal) {
+            modal.style.display = 'none';
+            modal.classList.remove('active');
+        }
+        document.body.style.overflow = '';
+    }
+
+    function triggerDocumentPrint() {
+        const iframe = document.getElementById('printPdfPreviewIframe');
+        if (iframe && iframe.contentWindow) {
+            try {
+                iframe.contentWindow.focus();
+                iframe.contentWindow.print();
+                return;
+            } catch (err) {
+                console.warn('Iframe print failed, falling back to window.print():', err);
+            }
+        }
+        
+        closePrintPreviewModal();
+        setTimeout(() => {
+            window.print();
+        }, 200);
+    }
+
+    function closePrintPreviewOnBackdrop(e) {
+        if (e.target.id === 'printPreviewModal') {
+            closePrintPreviewModal();
+        }
+    }
+
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && document.getElementById('printPreviewModal')?.classList.contains('active')) {
+            closePrintPreviewModal();
+        }
+    });
+
+    document.addEventListener('DOMContentLoaded', () => {
+        if (window.lucide) {
+            lucide.createIcons();
+        }
+    });
+</script>
+{% endblock %}

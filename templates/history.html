@@ -1,0 +1,114 @@
+{% extends "app_layout.html" %}
+
+{% block title %}2. ประวัติการตรวจสอบ - LXP Sale Monitor{% endblock %}
+
+{% block breadcrumb %}
+    <a href="{{ url_for('dashboard') }}" class="breadcrumb-link">หน้าหลัก</a>
+    <span class="breadcrumb-separator">/</span>
+    <span class="breadcrumb-item">2. ประวัติการตรวจสอบ</span>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1 class="page-title">2. ประวัติการตรวจสอบรายการ (Audit History)</h1>
+        <p class="page-subtitle">บันทึกผลการตรวจสอบทั้งหมด และสถานะการอนุมัติ</p>
+    </div>
+</div>
+
+<!-- Filters and Search Bar -->
+<div class="filter-card">
+    <form action="{{ url_for('history') }}" method="GET" class="filter-form">
+        <div class="filter-search-box">
+            <i data-lucide="search" class="search-icon"></i>
+            <input 
+                type="text" 
+                name="q" 
+                value="{{ search_query }}" 
+                placeholder="ค้นหารหัส, ชื่อรายการ, หรือผู้ส่ง..." 
+                class="filter-input"
+            >
+        </div>
+
+        <div class="filter-tags">
+            <a href="{{ url_for('history', status='ALL', q=search_query) }}" class="filter-pill {% if current_status == 'ALL' %}active{% endif %}">ทั้งหมด</a>
+            <a href="{{ url_for('history', status='APPROVED', q=search_query) }}" class="filter-pill status-pill-approved {% if current_status == 'APPROVED' %}active{% endif %}">อนุมัติแล้ว</a>
+            <a href="{{ url_for('history', status='PENDING', q=search_query) }}" class="filter-pill status-pill-pending {% if current_status == 'PENDING' %}active{% endif %}">รอตรวจสอบ</a>
+            <a href="{{ url_for('history', status='REJECTED', q=search_query) }}" class="filter-pill status-pill-rejected {% if current_status == 'REJECTED' %}active{% endif %}">ไม่อนุมัติ</a>
+        </div>
+    </form>
+</div>
+
+<!-- History Table -->
+<div class="content-card">
+    <div class="table-responsive">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>รหัสรายการ</th>
+                    <th>ชื่อรายการสินค้า</th>
+                    <th>หมวดหมู่</th>
+                    <th>จำนวน</th>
+                    <th>ผู้ส่งตรวจ</th>
+                    <th>สถานะ</th>
+                    <th>ผู้ตรวจสอบ / หมายเหตุ</th>
+                    <th>วันที่บันทึก / วันที่ตรวจ</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% if items %}
+                    {% for item in items %}
+                        <tr>
+                            <td><span class="code-badge">{{ item.item_code }}</span></td>
+                            <td class="font-medium">{{ item.item_name }}</td>
+                            <td><span class="category-pill">{{ item.category }}</span></td>
+                            <td>{{ item.quantity }} ชิ้น</td>
+                            <td><span class="user-pill">{{ item.submitted_by }}</span></td>
+                            <td>
+                                {% if item.status == 'APPROVED' %}
+                                    <span class="status-badge status-approved">
+                                        <i data-lucide="check"></i> อนุมัติแล้ว
+                                    </span>
+                                {% elif item.status == 'REJECTED' %}
+                                    <span class="status-badge status-rejected">
+                                        <i data-lucide="x"></i> ไม่อนุมัติ
+                                    </span>
+                                {% else %}
+                                    <span class="status-badge status-pending">
+                                        <i data-lucide="clock"></i> รอตรวจสอบ
+                                    </span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if item.inspected_by %}
+                                    <div class="inspector-info">
+                                        <span class="inspector-name"><i data-lucide="user-check" class="inline-icon"></i> {{ item.inspected_by }}</span>
+                                        {% if item.inspector_notes %}
+                                            <span class="inspector-note" title="{{ item.inspector_notes }}">{{ item.inspector_notes }}</span>
+                                        {% endif %}
+                                    </div>
+                                {% else %}
+                                    <span class="text-dim text-sm">- ยังไม่ระบุ -</span>
+                                {% endif %}
+                            </td>
+                            <td class="text-dim text-sm">
+                                <div>ส่ง: {{ item.created_at.strftime('%d/%m/%Y %H:%M') if item.created_at else '-' }}</div>
+                                {% if item.inspected_at %}
+                                    <div class="text-accent text-xs">ตรวจ: {{ item.inspected_at.strftime('%d/%m/%Y %H:%M') }}</div>
+                                {% endif %}
+                            </td>
+                        </tr>
+                    {% endfor %}
+                {% else %}
+                    <tr>
+                        <td colspan="8" class="table-empty">
+                            <i data-lucide="file-question" class="empty-icon"></i>
+                            <p>ไม่พบประวัติการตรวจสอบที่ตรงกับเงื่อนไข</p>
+                        </td>
+                    </tr>
+                {% endif %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,896 @@
+{% extends "app_layout.html" %}
+
+{% block title %}ตารางการทำงานประจำวันของแม่บ้าน - LXP Monitor{% endblock %}
+
+{% block breadcrumb %}
+<span class="breadcrumb-item"><a href="{{ url_for('dashboard') }}">หน้าหลัก</a></span>
+<span class="breadcrumb-separator">/</span>
+<span class="breadcrumb-item"><a href="{{ url_for('maid.maid_schedule_history') }}">ประวัติตารางแม่บ้าน</a></span>
+<span class="breadcrumb-separator">/</span>
+<span class="breadcrumb-item active">ตารางการทำงานแม่บ้าน</span>
+{% endblock %}
+
+{% block content %}
+<div class="maid-sheet-container">
+    <!-- Top Filter / Control Bar -->
+    <div class="content-card control-card"
+        style="padding: 16px 20px; margin-bottom: 16px; background: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 14px; box-shadow: 0 4px 18px rgba(0,0,0,0.04);">
+        <div style="display: flex; align-items: center; justify-content: space-between; gap: 14px; flex-wrap: wrap;">
+            <!-- Left: Branch & Month Selectors -->
+            <form method="GET" action="{{ url_for('maid.maid_schedule') }}" id="sheetFilterForm"
+                style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin: 0;">
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <label class="form-label"
+                        style="margin: 0; font-size: 0.88rem; font-weight: 700; color: #1E293B; display: inline-flex; align-items: center; gap: 5px; white-space: nowrap;">
+                        <i data-lucide="map-pin" style="width: 16px; height: 16px; color: #DC2626;"></i>
+                        <span>สาขา</span>
+                    </label>
+                    {% if current_user.role == 'ADMIN' %}
+                    <select name="branch" class="form-select"
+                        onchange="document.getElementById('sheetFilterForm').submit()"
+                        style="min-width: 180px; padding: 8px 36px 8px 14px; background-color: #FFFFFF; border: 1px solid #CBD5E1; border-radius: 8px; font-size: 0.9rem; font-weight: 600; color: #0F172A; outline: none; cursor: pointer;">
+                        {% for b in branches %}
+                        <option value="{{ b }}" {% if selected_branch==b %}selected{% endif %}>{{ b }}</option>
+                        {% endfor %}
+                    </select>
+                    {% else %}
+                    <span style="font-weight: 600; font-size: 0.9rem; color: #1E293B; padding: 7px 14px; background: #F8FAFC; border: 1px solid #CBD5E1; border-radius: 8px; display: inline-flex; align-items: center;">
+                        <span>4B โคราช</span>
+                    </span>
+                    <input type="hidden" name="branch" value="4B โคราช">
+                    {% endif %}
+                </div>
+
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <label class="form-label"
+                        style="margin: 0; font-size: 0.88rem; font-weight: 700; color: #1E293B; display: inline-flex; align-items: center; gap: 5px; white-space: nowrap;">
+                        <i data-lucide="calendar" style="width: 16px; height: 16px; color: #DC2626;"></i>
+                        <span>ประจำเดือน</span>
+                    </label>
+                    <input type="month" name="month" value="{{ selected_month }}"
+                        onchange="document.getElementById('sheetFilterForm').submit()"
+                        style="padding: 7px 12px; border: 1px solid #CBD5E1; border-radius: 8px; font-size: 0.9rem; font-weight: 600; color: #0F172A; outline: none; cursor: pointer;">
+                </div>
+            </form>
+
+            <!-- Right: Action Buttons -->
+            <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+                <a href="{{ url_for('maid.maid_schedule_history') }}" class="btn-sheet-secondary"
+                    style="display: inline-flex; align-items: center; gap: 6px; padding: 8px 14px; border-radius: 8px; background: #F1F5F9; border: 1px solid #CBD5E1; color: #334155; font-size: 0.88rem; font-weight: 600; text-decoration: none; transition: all 0.2s ease;">
+                    <i data-lucide="history" style="width: 15px; height: 15px;"></i>
+                    <span>ดูประวัติตาราง</span>
+                </a>
+
+                {% if schedule_id %}
+                <a href="{{ url_for('maid.maid_schedule_pdf', schedule_id=schedule_id) }}" target="_blank"
+                    class="btn-sheet-secondary"
+                    style="display: inline-flex; align-items: center; gap: 6px; padding: 8px 14px; border-radius: 8px; background: #EFF6FF; border: 1px solid #BFDBFE; color: #1D4ED8; font-size: 0.88rem; font-weight: 600; text-decoration: none; transition: all 0.2s ease;">
+                    <i data-lucide="file-text" style="width: 15px; height: 15px;"></i>
+                    <span>พิมพ์ PDF</span>
+                </a>
+                {% endif %}
+
+                {% if is_locked %}
+                <span style="display: inline-flex; align-items: center; gap: 6px; padding: 8px 16px; border-radius: 8px; background: #FEF3C7; border: 1.5px solid #FCD34D; color: #92400E; font-size: 0.88rem; font-weight: 700;">
+                    <i data-lucide="lock" style="width: 16px; height: 16px; color: #D97706;"></i>
+                    <span>บันทึกแล้ว</span>
+                </span>
+                {% else %}
+                <button type="button" onclick="submitMaidForm()" class="btn-primary-modern"
+                    style="display: inline-flex; align-items: center; gap: 6px; padding: 8px 18px; border-radius: 8px; background: linear-gradient(135deg, #DC2626 0%, #B91C1C 100%); color: #FFFFFF; border: none; font-size: 0.9rem; font-weight: 700; cursor: pointer; box-shadow: 0 3px 10px rgba(220,38,38,0.25); transition: all 0.2s ease;">
+                    <i data-lucide="save" style="width: 16px; height: 16px;"></i>
+                    <span>บันทึกตาราง</span>
+                </button>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Official White Sheet Container -->
+    <div class="sheet-paper-container">
+        <form action="{{ url_for('maid.maid_schedule') }}" method="POST" id="maidScheduleForm">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <input type="hidden" name="branch" value="{{ selected_branch }}">
+            <input type="hidden" name="month_year" value="{{ selected_month }}">
+            <!-- Locked Alert for Regular Users -->
+            {% if is_locked %}
+            <div class="sheet-locked-alert" style="margin-bottom: 16px; padding: 12px 18px; border-radius: 10px; background: #FFFBEB; border: 1.5px solid #FCD34D; color: #92400E; display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;">
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <div style="width: 36px; height: 36px; border-radius: 8px; background: #FEF3C7; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+                        <i data-lucide="lock" style="width: 18px; height: 18px; color: #D97706;"></i>
+                    </div>
+                    <div>
+                        <div style="font-size: 0.92rem; font-weight: 700; color: #92400E;">
+                            ตารางการทำงานแม่บ้านประจำเดือนนี้ได้รับการบันทึกเรียบร้อยแล้ว
+                        </div>
+                        <div style="font-size: 0.82rem; color: #B45309; margin-top: 2px;">
+                            ฝั่งผู้ใช้งานดูข้อมูลได้อย่างเดียว ไม่สามารถแก้ไขได้ {% if submitted_by %}(บันทึกโดย <strong>{{ submitted_by }}</strong>){% endif %} หากต้องการแก้ไขกรุณาติดต่อผู้ดูแลระบบ (Admin)
+                        </div>
+                    </div>
+                </div>
+                {% if schedule_id %}
+                <a href="{{ url_for('maid.maid_schedule_detail', schedule_id=schedule_id) }}" class="btn-sheet-secondary" style="background: #FFFFFF; font-size: 0.84rem; padding: 6px 12px; border-radius: 8px; border: 1px solid #FCD34D; color: #92400E; text-decoration: none; font-weight: 600; display: inline-flex; align-items: center; gap: 5px;">
+                    <i data-lucide="file-check" style="width: 14px; height: 14px;"></i>
+                    <span>ดูเอกสารฉบับทางการ</span>
+                </a>
+                {% endif %}
+            </div>
+            {% endif %}
+
+            <!-- Form Header -->
+            <div class="sheet-header-section"
+                style="margin-bottom: 16px; border-bottom: 2px solid #E2E8F0; padding-bottom: 14px;">
+                <div
+                    style="display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap;">
+                    <div style="display: flex; align-items: center; gap: 14px;">
+                        <img src="{{ url_for('static', filename='img/landy_logo.png') }}" alt="Landy Logo"
+                            style="height: 40px; width: auto; object-fit: contain;">
+                        <div>
+                            <h2
+                                style="margin: 0; font-size: 1.2rem; font-weight: 700; color: #0F172A; line-height: 1.3;">
+                                ตารางการทำงานแม่บ้าน สำนักงานขายประจำวัน
+                            </h2>
+                            <div
+                                style="margin-top: 5px; font-size: 0.9rem; color: #475569; font-weight: 600; display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+                                <span>สาขา: <strong style="color: #DC2626; font-size: 0.95rem;">{{ selected_branch
+                                        }}</strong></span>
+                                <span style="color: #CBD5E1;">|</span>
+                                <span>ตารางเดือน: <strong style="color: #0F172A; font-size: 0.95rem;">{{
+                                        selected_month_th }}</strong></span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Table 1: ประจำวัน (Daily Tasks 1-19) -->
+            <div class="table-section-title"
+                style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
+                <div
+                    style="display: flex; align-items: center; gap: 6px; font-size: 0.96rem; font-weight: 700; color: #0F172A;">
+                    <span
+                        style="background: #DC2626; color: #FFFFFF; width: 22px; height: 22px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; font-size: 0.78rem;">1</span>
+                    <span>ตารางการทำงานประจำวัน</span>
+                </div>
+            </div>
+
+            <div class="maid-table-wrapper">
+                <table class="maid-grid-table">
+                    <thead>
+                        <tr>
+                            <th class="col-sticky col-no" style="width: 45px;">ลำดับ</th>
+                            <th class="col-sticky col-desc" style="width: 240px;">รายละเอียด</th>
+                            <th class="col-sticky col-time" style="width: 110px;">ช่วงเวลาทำงาน</th>
+                            {% for d in range(1, 32) %}
+                            <th class="col-day col-day-{{ d }} {% if not is_admin and d not in active_week_info.days %}col-day-inactive-mobile{% endif %} {% if d > days_in_month %}col-disabled{% elif is_current_month and d == today_day %}col-today-header{% endif %}"
+                                style="width: 32px;">
+                                <div>{{ d }}</div>
+                                {% if is_current_month and d == today_day %}
+                                <div class="today-tag">วันนี้</div>
+                                {% endif %}
+                            </th>
+                            {% endfor %}
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for task in daily_tasks %}
+                        <tr class="{% if task.is_break %}row-break{% endif %}">
+                            <td class="col-sticky col-no text-center font-bold">{{ task.no }}</td>
+                            <td class="col-sticky col-desc {% if task.is_break %}font-bold text-amber{% endif %}">{{
+                                task.title }}</td>
+                            <td class="col-sticky col-time text-center">{{ task.time_slot }}</td>
+                            {% for d in range(1, 32) %}
+                            {% set is_editable = (current_user.role == 'ADMIN') or (is_current_month and d == today_day) %}
+                            <td
+                                class="col-day col-day-{{ d }} text-center {% if not is_admin and d not in active_week_info.days %}col-day-inactive-mobile{% endif %} {% if d > days_in_month %}col-disabled{% elif task.is_break %}cell-break{% elif is_current_month and d == today_day %}col-today-cell{% endif %}">
+                                {% if d <= days_in_month %} 
+                                    {% if task.is_break %} 
+                                        <span class="text-dim-dash">-</span>
+                                    {% else %}
+                                        {% set cell_key = task.no ~ '_' ~ d %}
+                                        {% set is_checked = sheet_data.daily.get(cell_key) if sheet_data and sheet_data.daily else false %}
+                                        <label class="custom-check-box" {% if not is_editable %}style="cursor: not-allowed;" title="สามารถบันทึกได้เฉพาะวันปัจจุบันเท่านั้น"{% endif %}>
+                                            <input type="checkbox" class="daily-check-input" data-task="{{ task.no }}"
+                                                data-day="{{ d }}" {% if is_checked %}checked{% endif %} {% if not is_editable %}disabled{% endif %}>
+                                            <span class="checkmark"></span>
+                                        </label>
+                                    {% endif %}
+                                {% endif %}
+                            </td>
+                            {% endfor %}
+                        </tr>
+                        {% endfor %}
+
+                        <!-- Row: ชื่อผู้ทำ -->
+                        <tr class="row-initials row-worker">
+                            <td class="col-sticky col-no text-center font-bold" style="background: #EFF6FF;">-</td>
+                            <td class="col-sticky col-desc font-bold text-blue" style="background: #EFF6FF;">ชื่อผู้ทำ
+                            </td>
+                            <td class="col-sticky col-time text-center" style="background: #EFF6FF;">ชื่อย่อ</td>
+                            {% for d in range(1, 32) %}
+                            {% set is_editable = (current_user.role == 'ADMIN') or (is_current_month and d == today_day) %}
+                            <td class="col-day col-day-{{ d }} text-center p-1 {% if not is_admin and d not in active_week_info.days %}col-day-inactive-mobile{% endif %} {% if d > days_in_month %}col-disabled{% elif is_current_month and d == today_day %}col-today-cell{% endif %}"
+                                style="background: #EFF6FF;">
+                                {% if d <= days_in_month %} 
+                                    {% set w_ini = sheet_data.worker_initials.get(d|string) if sheet_data and sheet_data.worker_initials else '' %} 
+                                    <input type="text"
+                                        class="initial-input worker-initial-input" data-day="{{ d }}"
+                                        value="{{ w_ini or '' }}" maxlength="3" placeholder=""
+                                        title="ชื่อย่อผู้ทำ วันที่ {{ d }}" {% if not is_editable %}readonly tabindex="-1"{% endif %}>
+                                {% endif %}
+                            </td>
+                            {% endfor %}
+                        </tr>
+
+                        <!-- Row: ชื่อผู้ตรวจ -->
+                        <tr class="row-initials row-inspector">
+                            <td class="col-sticky col-no text-center font-bold" style="background: #F0FDF4;">-</td>
+                            <td class="col-sticky col-desc font-bold text-green" style="background: #F0FDF4;">
+                                ชื่อผู้ตรวจ</td>
+                            <td class="col-sticky col-time text-center" style="background: #F0FDF4;">ชื่อย่อ</td>
+                            {% for d in range(1, 32) %}
+                            {% set is_editable = (current_user.role == 'ADMIN') or (is_current_month and d == today_day) %}
+                            <td class="col-day col-day-{{ d }} text-center p-1 {% if not is_admin and d not in active_week_info.days %}col-day-inactive-mobile{% endif %} {% if d > days_in_month %}col-disabled{% elif is_current_month and d == today_day %}col-today-cell{% endif %}"
+                                style="background: #F0FDF4;">
+                                {% if d <= days_in_month %} 
+                                    {% set i_ini = sheet_data.inspector_initials.get(d|string) if sheet_data and sheet_data.inspector_initials else '' %} 
+                                    <input type="text"
+                                        class="initial-input inspector-initial-input" data-day="{{ d }}"
+                                        value="{{ i_ini or '' }}" maxlength="3" placeholder=""
+                                        title="ชื่อย่อผู้ตรวจ วันที่ {{ d }}" {% if not is_editable %}readonly tabindex="-1"{% endif %}>
+                                {% endif %}
+                            </td>
+                            {% endfor %}
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Table 2: ประจำสัปดาห์ (Weekly Tasks 20-23) -->
+            <div class="table-section-title"
+                style="display: flex; align-items: center; justify-content: space-between; margin-top: 24px; margin-bottom: 8px;">
+                <div
+                    style="display: flex; align-items: center; gap: 6px; font-size: 0.96rem; font-weight: 700; color: #0F172A;">
+                    <span
+                        style="background: #2563EB; color: #FFFFFF; width: 22px; height: 22px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; font-size: 0.78rem;">2</span>
+                    <span>ตารางการทำงานประจำสัปดาห์</span>
+                </div>
+            </div>
+
+            <div class="maid-table-wrapper">
+                <table class="maid-grid-table">
+                    <thead>
+                        <tr>
+                            <th class="col-sticky col-no" style="width: 45px;">ลำดับ</th>
+                            <th class="col-sticky col-desc" style="width: 240px;">รายละเอียด</th>
+                            <th class="col-sticky col-time" style="width: 110px;">ช่วงเวลาทำงาน</th>
+                            {% for d in range(1, 32) %}
+                            <th class="col-day {% if d > days_in_month %}col-disabled{% elif is_current_month and d == today_day %}col-today-header{% endif %}"
+                                style="width: 32px;">
+                                <div>{{ d }}</div>
+                                {% if is_current_month and d == today_day %}
+                                <div class="today-tag">วันนี้</div>
+                                {% endif %}
+                            </th>
+                            {% endfor %}
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <!-- Dynamic 7-day Rolling Weekly Tasks (20 to 23) -->
+                        {% for task_no in [20, 21, 22, 23] %}
+                        {% set item = weekly_layout.get(task_no) %}
+                        {% if item %}
+                        {% set task = item.task %}
+                        <tr>
+                            <td class="col-sticky col-no text-center font-bold">{{ task.no }}</td>
+                            <td class="col-sticky col-desc">{{ task.title }}</td>
+                            <td class="col-sticky col-time text-center">{{ task.time_slot }}</td>
+                            {% for seg in item.segments %}
+                                {% if seg.type == 'open' %}
+                                    {% set val = sheet_data.weekly.get(seg.key) if sheet_data and sheet_data.weekly else '' %}
+                                    {% if not val %}
+                                        {% set val = sheet_data.weekly.get(task.no|string) if sheet_data and sheet_data.weekly else '' %}
+                                    {% endif %}
+                                    <td colspan="{{ seg.colspan }}" class="cell-week-open text-center">
+                                        <input type="text" class="weekly-date-input" data-task="{{ seg.key }}" value="{{ val or '' }}" placeholder="ว/ด/ป" maxlength="12" title="กรอกวันที่ตรวจ (วันที่ {{ seg.start_day }}-{{ seg.end_day }})" {% if not seg.is_editable %}readonly tabindex="-1"{% endif %}>
+                                    </td>
+                                {% else %}
+                                    <td colspan="{{ seg.colspan }}" class="cell-week-blocked" title="ปิดทึบ (วันที่ {{ seg.start_day }}-{{ seg.end_day }})"></td>
+                                {% endif %}
+                            {% endfor %}
+                        </tr>
+                        {% endif %}
+                        {% endfor %}
+
+                        <!-- Weekly Row: ชื่อผู้ทำ -->
+                        <tr class="row-initials row-worker">
+                            <td class="col-sticky col-no text-center font-bold" style="background: #EFF6FF;">-</td>
+                            <td class="col-sticky col-desc font-bold text-blue" style="background: #EFF6FF;">ชื่อผู้ทำ
+                            </td>
+                            <td class="col-sticky col-time text-center" style="background: #EFF6FF;">ชื่อย่อ</td>
+                            {% for d in range(1, 32) %}
+                            {% set is_editable = (current_user.role == 'ADMIN') or (is_current_month and d == today_day) %}
+                            <td class="col-day text-center p-1 {% if d > days_in_month %}col-disabled{% elif is_current_month and d == today_day %}col-today-cell{% endif %}"
+                                style="background: #EFF6FF;">
+                                {% if d <= days_in_month %} 
+                                    {% set ww_ini = sheet_data.weekly_worker_initials.get(d|string) if sheet_data and sheet_data.weekly_worker_initials else '' %} 
+                                    <input type="text"
+                                        class="initial-input weekly-worker-initial-input" data-day="{{ d }}"
+                                        value="{{ ww_ini or '' }}" maxlength="3" placeholder="" {% if not is_editable %}readonly tabindex="-1"{% endif %}>
+                                {% endif %}
+                            </td>
+                            {% endfor %}
+                        </tr>
+
+                        <!-- Weekly Row: ชื่อผู้ตรวจ -->
+                        <tr class="row-initials row-inspector">
+                            <td class="col-sticky col-no text-center font-bold" style="background: #F0FDF4;">-</td>
+                            <td class="col-sticky col-desc font-bold text-green" style="background: #F0FDF4;">
+                                ชื่อผู้ตรวจ</td>
+                            <td class="col-sticky col-time text-center" style="background: #F0FDF4;">ชื่อย่อ</td>
+                            {% for d in range(1, 32) %}
+                            {% set is_editable = (current_user.role == 'ADMIN') or (is_current_month and d == today_day) %}
+                            <td class="col-day text-center p-1 {% if d > days_in_month %}col-disabled{% elif is_current_month and d == today_day %}col-today-cell{% endif %}"
+                                style="background: #F0FDF4;">
+                                {% if d <= days_in_month %} 
+                                    {% set wi_ini = sheet_data.weekly_inspector_initials.get(d|string) if sheet_data and sheet_data.weekly_inspector_initials else '' %} 
+                                    <input type="text"
+                                        class="initial-input weekly-inspector-initial-input" data-day="{{ d }}"
+                                        value="{{ wi_ini or '' }}" maxlength="3" placeholder="" {% if not is_editable %}readonly tabindex="-1"{% endif %}>
+                                {% endif %}
+                            </td>
+                            {% endfor %}
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Bottom Floating Save Bar -->
+            <div
+                style="display: flex; justify-content: flex-end; gap: 12px; margin-top: 20px; padding-top: 16px; border-top: 1px solid #E2E8F0;">
+                <button type="button" onclick="submitMaidForm()" class="btn-primary-modern"
+                    style="padding: 10px 24px; font-size: 0.95rem; font-weight: 700; border-radius: 10px; background: linear-gradient(135deg, #DC2626 0%, #B91C1C 100%); color: #FFFFFF; border: none; cursor: pointer; display: inline-flex; align-items: center; gap: 8px; box-shadow: 0 4px 14px rgba(220,38,38,0.3);">
+                    <i data-lucide="check-circle-2" style="width: 18px; height: 18px;"></i>
+                    <span>บันทึกตารางการทำงานแม่บ้าน</span>
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<style>
+    .maid-sheet-container {
+        width: 100%;
+        max-width: 100%;
+        margin: 0 auto;
+        padding-bottom: 40px;
+    }
+
+    .sheet-paper-container {
+        background: #FFFFFF;
+        border: 1px solid #CBD5E1;
+        border-radius: 14px;
+        padding: 20px;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+        box-sizing: border-box;
+    }
+
+    .maid-table-wrapper {
+        width: 100%;
+        max-width: 100%;
+        overflow-x: auto !important;
+        overflow-y: hidden;
+        -webkit-overflow-scrolling: touch !important;
+        touch-action: pan-x pan-y !important;
+        border: 1px solid #CBD5E1;
+        border-radius: 10px;
+        background: #FFFFFF;
+        box-sizing: border-box;
+    }
+
+    .maid-grid-table {
+        min-width: 1350px !important;
+        width: max-content !important;
+        border-collapse: separate;
+        border-spacing: 0;
+        font-size: 0.86rem;
+        table-layout: fixed;
+        background: #FFFFFF;
+    }
+
+    .maid-grid-table th,
+    .maid-grid-table td {
+        border-right: 1px solid #E2E8F0;
+        border-bottom: 1px solid #E2E8F0;
+        padding: 6px 4px;
+        vertical-align: middle;
+        box-sizing: border-box;
+    }
+
+    .maid-grid-table th {
+        background: #F8FAFC;
+        color: #1E293B;
+        font-weight: 700;
+        font-size: 0.82rem;
+        text-align: center;
+        position: sticky;
+        top: 0;
+        z-index: 10;
+    }
+
+    /* Sticky columns on horizontal scroll (Desktop) */
+    .col-sticky {
+        position: sticky !important;
+        background: #FFFFFF !important;
+        z-index: 4 !important;
+    }
+
+    th.col-sticky {
+        z-index: 14 !important;
+        background: #F8FAFC !important;
+    }
+
+    .col-no {
+        left: 0;
+        width: 45px;
+        min-width: 45px;
+        max-width: 45px;
+        text-align: center;
+    }
+
+    .col-desc {
+        left: 45px;
+        width: 240px;
+        min-width: 240px;
+        max-width: 240px;
+        white-space: normal;
+        line-height: 1.3;
+        font-weight: 500;
+        padding: 6px 8px !important;
+    }
+
+    .col-time {
+        left: 285px;
+        width: 110px;
+        min-width: 110px;
+        max-width: 110px;
+        white-space: nowrap;
+        font-size: 0.8rem;
+        color: #475569;
+        font-weight: 600;
+        text-align: center;
+        border-right: 1px solid #E2E8F0 !important;
+        box-shadow: none !important;
+    }
+
+    .col-day {
+        width: 38px;
+        min-width: 38px;
+        max-width: 38px;
+        text-align: center;
+        padding: 3px 1px !important;
+    }
+
+    /* Mobile & Tablet Responsiveness (<= 768px) */
+    @media (max-width: 768px) {
+        .sheet-paper-container {
+            padding: 12px 6px !important;
+            border-radius: 10px !important;
+        }
+
+        .maid-grid-table {
+            min-width: 480px !important;
+            width: 100% !important;
+        }
+
+        .col-no {
+            position: sticky !important;
+            left: 0 !important;
+            width: 28px !important;
+            min-width: 28px !important;
+            max-width: 28px !important;
+            font-size: 0.76rem !important;
+            padding: 4px 1px !important;
+            z-index: 4 !important;
+        }
+
+        .col-desc {
+            position: sticky !important;
+            left: 28px !important;
+            width: 125px !important;
+            min-width: 125px !important;
+            max-width: 125px !important;
+            font-size: 0.75rem !important;
+            padding: 4px 6px !important;
+            z-index: 4 !important;
+        }
+
+        .col-time {
+            position: sticky !important;
+            left: 153px !important;
+            width: 75px !important;
+            min-width: 75px !important;
+            max-width: 75px !important;
+            font-size: 0.70rem !important;
+            padding: 4px 2px !important;
+            border-right: 1px solid #E2E8F0 !important;
+            box-shadow: none !important;
+            z-index: 4 !important;
+        }
+
+        th.col-no {
+            position: sticky !important;
+            top: 0 !important;
+            left: 0 !important;
+            z-index: 14 !important;
+            background: #F8FAFC !important;
+        }
+
+        th.col-desc {
+            position: sticky !important;
+            top: 0 !important;
+            left: 28px !important;
+            z-index: 14 !important;
+            background: #F8FAFC !important;
+        }
+
+        th.col-time {
+            position: sticky !important;
+            top: 0 !important;
+            left: 153px !important;
+            z-index: 14 !important;
+            background: #F8FAFC !important;
+            border-right: 1px solid #E2E8F0 !important;
+            box-shadow: none !important;
+        }
+
+        .col-day {
+            width: 36px !important;
+            min-width: 36px !important;
+            max-width: 36px !important;
+        }
+
+        .col-day-inactive-mobile {
+            display: none !important;
+        }
+    }
+
+    /* Today's Column Highlight */
+    .col-today-header {
+        background: #FEF3C7 !important;
+        color: #92400E !important;
+        border-left: 2px solid #F59E0B !important;
+        border-right: 2px solid #F59E0B !important;
+    }
+
+    .col-today-cell {
+        background: #FFFBEB !important;
+        border-left: 2px solid #FDE68A !important;
+        border-right: 2px solid #FDE68A !important;
+    }
+
+    .today-tag {
+        font-size: 0.62rem;
+        background: #D97706;
+        color: #FFFFFF;
+        padding: 1px 3px;
+        border-radius: 3px;
+        line-height: 1;
+        margin-top: 1px;
+        font-weight: 700;
+    }
+
+    .col-disabled {
+        background: #F1F5F9 !important;
+        cursor: not-allowed;
+    }
+
+    .row-break td.col-sticky {
+        background: #FFFBEB !important;
+    }
+
+    .row-break {
+        background: #FFFBEB;
+    }
+
+    .cell-break {
+        background: #FEF3C7;
+    }
+
+    .text-amber {
+        color: #B45309;
+    }
+
+    .text-blue {
+        color: #1D4ED8;
+    }
+
+    .text-green {
+        color: #15803D;
+    }
+
+    .text-dim-dash {
+        color: #94A3B8;
+        font-weight: bold;
+    }
+
+    /* Custom Checkbox */
+    .custom-check-box {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        position: relative;
+        cursor: pointer;
+        user-select: none;
+        width: 24px;
+        height: 24px;
+        margin: 0 auto;
+    }
+
+    .custom-check-box input {
+        position: absolute;
+        opacity: 0;
+        cursor: pointer;
+        height: 0;
+        width: 0;
+    }
+
+    .checkmark {
+        position: absolute;
+        top: 2px;
+        left: 2px;
+        height: 20px;
+        width: 20px;
+        background-color: #FFFFFF;
+        border: 1.5px solid #94A3B8;
+        border-radius: 4px;
+        transition: all 0.15s ease;
+    }
+
+    .custom-check-box:hover input~.checkmark {
+        border-color: #15803D;
+        background-color: #F0FDF4;
+    }
+
+    .custom-check-box input:checked~.checkmark {
+        background-color: #15803D;
+        border-color: #15803D;
+        box-shadow: 0 2px 5px rgba(21, 128, 61, 0.3);
+    }
+
+    .checkmark:after {
+        content: "";
+        position: absolute;
+        display: none;
+    }
+
+    .custom-check-box input:checked~.checkmark:after {
+        display: block;
+        left: 6px;
+        top: 2px;
+        width: 5px;
+        height: 10px;
+        border: solid white;
+        border-width: 0 2px 2px 0;
+        transform: rotate(45deg);
+    }
+
+    /* Disabled checkmark styling */
+    .custom-check-box input:disabled ~ .checkmark {
+        cursor: not-allowed !important;
+    }
+
+    .custom-check-box input:disabled:not(:checked) ~ .checkmark {
+        background-color: #F8FAFC !important;
+        border-color: #E2E8F0 !important;
+        opacity: 0.45;
+    }
+
+    .custom-check-box input:disabled:checked ~ .checkmark {
+        background-color: #16A34A !important;
+        border-color: #16A34A !important;
+        opacity: 0.95;
+        cursor: default !important;
+    }
+
+    /* Initial Input Box */
+    .initial-input {
+        width: 100%;
+        max-width: 34px;
+        height: 24px;
+        text-align: center;
+        border: 1px solid #CBD5E1;
+        border-radius: 4px;
+        font-size: 0.72rem;
+        font-weight: 700;
+        color: #0F172A;
+        text-transform: uppercase;
+        letter-spacing: -0.3px;
+        background: #FFFFFF;
+        padding: 0 1px;
+        box-sizing: border-box;
+        outline: none;
+        transition: all 0.15s ease;
+    }
+
+    .initial-input:focus {
+        border-color: #2563EB;
+        box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.2);
+    }
+
+    /* Readonly initial inputs for locked days */
+    .initial-input[readonly] {
+        cursor: not-allowed !important;
+        background: #F8FAFC !important;
+        border-color: #E2E8F0 !important;
+        color: #475569 !important;
+        box-shadow: none !important;
+    }
+
+    .initial-input:not([readonly]) {
+        border: 1.5px solid #2563EB !important;
+        background: #FFFFFF !important;
+        box-shadow: 0 0 0 1.5px rgba(37, 99, 235, 0.2) !important;
+    }
+
+    /* Weekly Table Blocked and Open Cells */
+    .cell-week-blocked {
+        background-color: #E2E8F0 !important;
+        background-image: repeating-linear-gradient(45deg, #E2E8F0, #E2E8F0 6px, #CBD5E1 6px, #CBD5E1 12px) !important;
+        border-right: 1px solid #CBD5E1 !important;
+        cursor: not-allowed;
+    }
+
+    .cell-week-open {
+        background: #FFFFFF !important;
+        padding: 3px 2px !important;
+        text-align: center;
+        vertical-align: middle;
+    }
+
+    .weekly-date-input {
+        width: 100%;
+        min-width: 48px;
+        max-width: 140px;
+        height: 25px;
+        padding: 0 2px;
+        text-align: center;
+        font-weight: 700;
+        font-size: 0.82rem;
+        letter-spacing: -0.2px;
+        color: #0F172A;
+        border: 1.5px solid #2563EB;
+        border-radius: 5px;
+        background: #EFF6FF;
+        outline: none;
+        transition: all 0.2s ease;
+    }
+
+    .weekly-date-input::placeholder {
+        color: #94A3B8;
+        font-size: 0.76rem;
+        font-weight: 600;
+    }
+
+    .weekly-date-input:focus {
+        border-color: #1D4ED8;
+        background: #FFFFFF;
+        box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.25);
+    }
+
+    .weekly-date-input[readonly] {
+        border-color: #CBD5E1 !important;
+        background: #F8FAFC !important;
+        color: #475569 !important;
+        cursor: not-allowed;
+        box-shadow: none !important;
+    }
+
+    .row-worker td.col-sticky {
+        background: #EFF6FF !important;
+    }
+
+    .row-inspector td.col-sticky {
+        background: #F0FDF4 !important;
+    }
+
+    {% if is_locked %}
+    .sheet-paper-container table {
+        pointer-events: none !important;
+        user-select: none !important;
+    }
+    .sheet-paper-container input,
+    .sheet-paper-container textarea {
+        pointer-events: none !important;
+        background-color: #F8FAFC !important;
+        cursor: not-allowed !important;
+    }
+    .sheet-paper-container input[type="checkbox"] {
+        opacity: 0.75;
+    }
+    {% endif %}
+</style>
+
+<script>
+    function collectSheetData() {
+        const sheetData = {
+            daily: {},
+            weekly: {},
+            worker_initials: {},
+            inspector_initials: {},
+            weekly_worker_initials: {},
+            weekly_inspector_initials: {}
+        };
+
+        // Daily Checkboxes
+        document.querySelectorAll('.daily-check-input').forEach(chk => {
+            const taskNo = chk.dataset.task;
+            const day = chk.dataset.day;
+            if (chk.checked) {
+                sheetData.daily[`${taskNo}_${day}`] = true;
+            }
+        });
+
+        // Weekly Dates (Tasks 20-23)
+        document.querySelectorAll('.weekly-date-input').forEach(inp => {
+            const taskNo = inp.dataset.task;
+            const val = inp.value.trim();
+            if (val) {
+                sheetData.weekly[taskNo] = val;
+            }
+        });
+
+        // Daily Initials
+        document.querySelectorAll('.worker-initial-input').forEach(inp => {
+            const day = inp.dataset.day;
+            const val = inp.value.trim().toUpperCase();
+            if (val) sheetData.worker_initials[day] = val;
+        });
+
+        document.querySelectorAll('.inspector-initial-input').forEach(inp => {
+            const day = inp.dataset.day;
+            const val = inp.value.trim().toUpperCase();
+            if (val) sheetData.inspector_initials[day] = val;
+        });
+
+        // Weekly Initials
+        document.querySelectorAll('.weekly-worker-initial-input').forEach(inp => {
+            const day = inp.dataset.day;
+            const val = inp.value.trim().toUpperCase();
+            if (val) sheetData.weekly_worker_initials[day] = val;
+        });
+
+        document.querySelectorAll('.weekly-inspector-initial-input').forEach(inp => {
+            const day = inp.dataset.day;
+            const val = inp.value.trim().toUpperCase();
+            if (val) sheetData.weekly_inspector_initials[day] = val;
+        });
+
+        return sheetData;
+    }
+
+    function submitMaidForm() {
+        const data = collectSheetData();
+        document.getElementById('sheetDataJsonInput').value = JSON.stringify(data);
+        document.getElementById('maidScheduleForm').submit();
+    }
+
+    // Auto-uppercase and limit to 3 characters for initial inputs
+    document.addEventListener('DOMContentLoaded', () => {
+        document.querySelectorAll('.initial-input').forEach(inp => {
+            inp.addEventListener('input', (e) => {
+                e.target.value = e.target.value.toUpperCase().slice(0, 3);
+            });
+        });
+
+        {% if is_locked %}
+        const sheetForm = document.getElementById('maidScheduleForm');
+        if (sheetForm) {
+            sheetForm.querySelectorAll('input:not([type="hidden"]), textarea, select').forEach(el => {
+                el.disabled = true;
+            });
+        }
+        {% endif %}
+    });
+</script>
+{% endblock %}

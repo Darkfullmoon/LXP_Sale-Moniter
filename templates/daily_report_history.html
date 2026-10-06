@@ -1,0 +1,680 @@
+{% extends "app_layout.html" %}
+
+{% block title %}ประวัติรายงานการปฏิบัติงานสำนักงานขาย - LXP Monitor{% endblock %}
+
+{% block breadcrumb %}
+<span class="breadcrumb-item"><a href="{{ url_for('dashboard') }}">หน้าหลัก</a></span>
+<span class="breadcrumb-separator">/</span>
+<span class="breadcrumb-item active">ประวัติรายงานการปฏิบัติงาน</span>
+{% endblock %}
+
+{% block content %}
+<div class="audit-history-container">
+    <!-- Header Card -->
+    <div class="content-header-card">
+        <h1 class="content-title">ประวัติรายงานการปฏิบัติงานสำนักงานขาย (FM-MS-224)</h1>
+    </div>
+
+    <!-- AI Summarize Themed Filter Bar -->
+    <div class="content-card ai-filter-card" style="padding: 16px 22px; margin-top: 18px; margin-bottom: 20px;">
+        <form method="GET" action="{{ url_for('daily_report_history') }}" style="margin: 0;">
+            <div style="display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap;">
+                <!-- Left: Branch Select, Date Picker & Reset Button -->
+                <div style="display: flex; align-items: center; gap: 14px; flex-wrap: wrap;">
+                    <!-- Branch Select -->
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <label class="form-label" style="margin: 0; font-size: 0.88rem; font-weight: 600; color: #334155; display: inline-flex; align-items: center; gap: 6px; white-space: nowrap;">
+                            <i data-lucide="map-pin" class="form-icon" style="width: 16px; height: 16px; color: #DC2626;"></i>
+                            <span>เลือกสาขา</span>
+                        </label>
+                        <select name="branch" class="form-select" onchange="this.form.submit()" style="width: 100%; max-width: 200px; padding: 9px 36px 9px 14px; background-color: #FFFFFF; border: 1px solid #CBD5E1; border-radius: 10px; color: #0F172A; font-size: 0.92rem; font-weight: 500; outline: none; cursor: pointer;">
+                            <option value="ALL" {% if current_branch == 'ALL' %}selected{% endif %}>ทุกสาขา</option>
+                            {% for b in branches %}
+                            <option value="{{ b }}" {% if current_branch == b %}selected{% endif %}>{{ b }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <!-- Date Filter -->
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <label class="form-label" style="margin: 0; font-size: 0.88rem; font-weight: 600; color: #334155; display: inline-flex; align-items: center; gap: 6px; white-space: nowrap;">
+                            <i data-lucide="calendar" class="form-icon" style="width: 16px; height: 16px; color: #DC2626;"></i>
+                            <span>วันที่รายงาน</span>
+                        </label>
+                        <input type="date" name="date" value="{{ current_date }}" onchange="this.form.submit()"
+                               style="padding: 8px 12px; background-color: #FFFFFF; border: 1px solid #CBD5E1; border-radius: 10px; color: #0F172A; font-size: 0.92rem; font-weight: 500; outline: none; cursor: pointer;">
+                    </div>
+
+                    {% if current_branch != 'ALL' or current_date or search_query %}
+                    <a href="{{ url_for('daily_report_history') }}" class="btn-sheet-secondary" style="display: inline-flex; align-items: center; gap: 6px; padding: 8px 14px; border-radius: 10px; background: #FFFFFF; border: 1px solid #CBD5E1; color: #475569; font-size: 0.86rem; font-weight: 600; text-decoration: none; transition: all 0.2s ease;">
+                        <i data-lucide="rotate-ccw" style="width: 14px; height: 14px;"></i>
+                        <span>ล้างตัวกรอง</span>
+                    </a>
+                    {% endif %}
+                </div>
+
+                <!-- Right (Above "รายงาน" Column): Search Box with AI-themed red button -->
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <div style="position: relative; display: flex; align-items: center; width: 100%; max-width: 280px;">
+                        <input type="text" name="q" value="{{ search_query }}" 
+                               class="form-input" placeholder="ค้นหาตามสาขา..."
+                               style="width: 100%; padding: 9px 42px 9px 14px; background-color: #FFFFFF; border: 1px solid #CBD5E1; border-radius: 10px; color: #0F172A; font-size: 0.92rem; font-weight: 500; outline: none; transition: all 0.2s ease;">
+                        <button type="submit" title="ค้นหา" style="position: absolute; right: 4px; top: 50%; transform: translateY(-50%); background: linear-gradient(135deg, #DC2626 0%, #B91C1C 100%); color: #FFFFFF; border: none; border-radius: 7px; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; cursor: pointer; box-shadow: 0 2px 6px rgba(220, 38, 38, 0.25); transition: all 0.2s ease;">
+                            <i data-lucide="search" style="width: 15px; height: 15px;"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </form>
+    </div>
+
+    <!-- Reports Table / List Card -->
+    <div class="table-card-modern">
+        {% if reports and reports|length > 0 %}
+        <div class="table-responsive">
+            <table class="data-table-modern audit-history-table">
+                <thead>
+                    <tr>
+                        <th class="col-center" style="width: 70px;">ID</th>
+                        <th style="width: 28%; padding-left: 28px;">สาขา</th>
+                        <th style="width: 24%;">วันที่รายงาน</th>
+                        <th class="col-center" style="width: 28%;">บันทึกเมื่อ</th>
+                        <th class="col-center" style="width: 130px;">รายงาน</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in reports %}
+                    <tr class="daily-report-row">
+                        <td class="col-center col-id">
+                            <span class="id-tag">{{ item.id }}</span>
+                        </td>
+                        <td class="col-branch">
+                            <div class="branch-name-title">
+                                <i data-lucide="map-pin" class="table-mini-icon"></i>
+                                <span>{{ item.branch | format_branch }}</span>
+                            </div>
+                            <span class="mobile-id-badge">#{{ item.id }}</span>
+                        </td>
+                        <td class="col-date">
+                            <span class="mobile-label">วันที่รายงาน:</span>
+                            <div class="date-badge">
+                                <i data-lucide="calendar" class="table-mini-icon"></i>
+                                <span>{{ item.report_date | format_date }}</span>
+                            </div>
+                        </td>
+                        <td class="col-center col-created">
+                            <span class="mobile-label">บันทึกเมื่อ:</span>
+                            <span class="text-dim-small">{{ item.created_at }}</span>
+                        </td>
+                        <td class="col-center col-action">
+                            <a href="{{ url_for('daily_report_detail', report_id=item.id) }}" class="btn-action-view" title="ดูรายงานฉบับเต็ม">
+                                <i data-lucide="file-text"></i>
+                                <span>ดูรายงาน</span>
+                            </a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <!-- Empty State -->
+        <div class="empty-state-modern">
+            <div class="empty-icon-wrap">
+                <i data-lucide="file-text"></i>
+            </div>
+            <h3 class="empty-title">ยังไม่มีประวัติรายงานการปฏิบัติงานสำนักงานขาย</h3>
+            <p class="empty-desc">เริ่มเขียนรายงานการปฏิบัติงานประจำวัน เพื่อบันทึกแผนงานและสรุปผลงาน FM-MS-224</p>
+            {% if current_user.role != 'ADMIN' %}
+            <a href="{{ url_for('daily_report') }}" class="btn-primary-modern" style="margin-top: 15px;">
+                <i data-lucide="plus-circle"></i>
+                <span>เขียนรายงานตอนนี้</span>
+            </a>
+            {% endif %}
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<style>
+    /* Balanced & Spacious Daily Report History Table - Full Width Desktop */
+    .audit-history-container {
+        max-width: 100%;
+        margin: 0 auto;
+        padding-bottom: 40px;
+        width: 100%;
+        box-sizing: border-box;
+    }
+
+    .table-card-modern {
+        background: #ffffff;
+        border-radius: 14px;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+        border: 1.5px solid #e2e8f0;
+        margin-top: 16px;
+        width: 100%;
+        max-width: 100%;
+        box-sizing: border-box;
+        overflow: hidden;
+    }
+
+    .table-card-modern .table-responsive,
+    .table-responsive {
+        width: 100%;
+        display: block;
+        box-sizing: border-box;
+    }
+
+    /* ================= CONTENT HEADER CARD ================= */
+    .content-header-card {
+        display: block;
+        margin-bottom: 4px;
+    }
+
+    /* ================= EMPTY STATE STYLES ================= */
+    .empty-state-modern {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        text-align: center;
+        padding: 56px 24px;
+        box-sizing: border-box;
+        width: 100%;
+        max-width: 100%;
+        margin: 0 auto;
+    }
+
+    .empty-icon-wrap {
+        width: 64px;
+        height: 64px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, #F8FAFC 0%, #F1F5F9 100%);
+        border: 1.5px solid #E2E8F0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin-bottom: 16px;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+    }
+
+    .empty-icon-wrap i {
+        width: 30px;
+        height: 30px;
+        color: #94A3B8;
+    }
+
+    .empty-title {
+        font-size: 1.15rem;
+        font-weight: 700;
+        color: #1E293B;
+        margin: 0 0 10px 0;
+        line-height: 1.5;
+        padding: 0 20px;
+        box-sizing: border-box;
+        word-break: break-word;
+        overflow-wrap: break-word;
+        max-width: 650px;
+    }
+
+    .empty-desc {
+        font-size: 0.92rem;
+        color: #64748B;
+        margin: 0;
+        line-height: 1.6;
+        padding: 0 20px;
+        box-sizing: border-box;
+        max-width: 540px;
+        word-break: break-word;
+        overflow-wrap: break-word;
+    }
+
+    .btn-primary-modern {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 10px 20px;
+        border-radius: 10px;
+        background: linear-gradient(135deg, #2563EB 0%, #1D4ED8 100%);
+        color: #FFFFFF;
+        font-weight: 600;
+        font-size: 0.9rem;
+        text-decoration: none;
+        transition: all 0.2s ease;
+        box-shadow: 0 4px 12px rgba(37, 99, 235, 0.25);
+    }
+
+    .btn-primary-modern:hover {
+        background: linear-gradient(135deg, #1D4ED8 0%, #1E40AF 100%);
+        transform: translateY(-2px);
+        box-shadow: 0 6px 16px rgba(37, 99, 235, 0.35);
+        color: #FFFFFF;
+    }
+
+    .audit-history-table {
+        width: 100%;
+        table-layout: fixed;
+        border-collapse: separate;
+        border-spacing: 0;
+        font-size: 0.92rem;
+    }
+
+    .audit-history-table th {
+        background: #f8fafc;
+        color: #334155;
+        font-weight: 600;
+        padding: 14px 16px;
+        font-size: 0.88rem;
+        border-bottom: 2px solid #e2e8f0;
+        white-space: nowrap;
+        letter-spacing: 0.2px;
+        text-align: left;
+    }
+
+    .audit-history-table th.col-center,
+    .audit-history-table td.col-center {
+        text-align: center !important;
+    }
+
+    .audit-history-table td {
+        padding: 14px 16px;
+        border-bottom: 1px solid #f1f5f9;
+        vertical-align: middle;
+        color: #1e293b;
+        line-height: 1.4;
+        text-align: left;
+    }
+
+    .mobile-label,
+    .mobile-id-badge {
+        display: none;
+    }
+
+    @media (min-width: 769px) and (max-width: 992px) {
+        .table-card-modern .table-responsive,
+        .table-responsive {
+            overflow-x: auto !important;
+            overflow-y: hidden !important;
+            -webkit-overflow-scrolling: touch !important;
+            touch-action: pan-x pan-y !important;
+        }
+        .audit-history-table {
+            min-width: 760px !important;
+        }
+    }
+
+    /* CARD VIEW TRANSFORMATION (Screens <= 768px) */
+    @media (max-width: 768px) {
+        .audit-history-container {
+            padding: 0 0 30px 0;
+            width: 100% !important;
+            max-width: 100% !important;
+        }
+
+        .content-title {
+            font-size: 1.25rem !important;
+        }
+
+        .ai-filter-card {
+            padding: 14px !important;
+            margin-top: 12px !important;
+            margin-bottom: 14px !important;
+            border-radius: 12px !important;
+        }
+
+        .ai-filter-card form > div {
+            flex-direction: column !important;
+            align-items: stretch !important;
+            gap: 12px !important;
+        }
+
+        .ai-filter-card form > div > div {
+            width: 100% !important;
+            flex-direction: column !important;
+            align-items: stretch !important;
+            gap: 10px !important;
+        }
+
+        .ai-filter-card .form-label {
+            margin-bottom: 2px !important;
+        }
+
+        .ai-filter-card .form-select,
+        .ai-filter-card input[type="date"],
+        .ai-filter-card .form-input,
+        .ai-filter-card div[style*="max-width: 280px"],
+        .ai-filter-card div[style*="max-width: 200px"] {
+            max-width: 100% !important;
+            width: 100% !important;
+            box-sizing: border-box !important;
+        }
+
+        .table-card-modern {
+            background: transparent !important;
+            border: none !important;
+            box-shadow: none !important;
+            margin-top: 10px !important;
+            overflow: visible !important;
+            padding: 0 !important;
+        }
+
+        .table-card-modern .table-responsive,
+        .table-responsive {
+            overflow: visible !important;
+        }
+
+        .audit-history-table {
+            display: block !important;
+            width: 100% !important;
+            min-width: 0 !important;
+            table-layout: auto !important;
+        }
+
+        .audit-history-table thead {
+            display: none !important;
+        }
+
+        .audit-history-table tbody {
+            display: flex !important;
+            flex-direction: column !important;
+            gap: 12px !important;
+            width: 100% !important;
+        }
+
+        .audit-history-table tbody tr.daily-report-row {
+            display: flex !important;
+            flex-direction: column !important;
+            background: #FFFFFF !important;
+            border: 1px solid #E2E8F0 !important;
+            border-radius: 14px !important;
+            padding: 14px 16px !important;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.04) !important;
+            gap: 8px !important;
+            box-sizing: border-box !important;
+            width: 100% !important;
+        }
+
+        .audit-history-table tbody tr.daily-report-row:hover {
+            background: #FFFFFF !important;
+            box-shadow: 0 4px 14px rgba(0, 0, 0, 0.08) !important;
+        }
+
+        .audit-history-table tbody td {
+            display: flex !important;
+            justify-content: space-between !important;
+            align-items: center !important;
+            padding: 2px 0 !important;
+            border: none !important;
+            width: 100% !important;
+            box-sizing: border-box !important;
+            text-align: left !important;
+        }
+
+        .audit-history-table tbody td.col-id {
+            display: none !important;
+        }
+
+        .mobile-id-badge {
+            display: inline-block;
+            font-size: 0.8rem;
+            font-weight: 700;
+            color: #64748B;
+            background: #F1F5F9;
+            padding: 2px 8px;
+            border-radius: 6px;
+        }
+
+        .mobile-label {
+            display: inline-block;
+            font-size: 0.80rem;
+            font-weight: 600;
+            color: #64748B;
+        }
+
+        .audit-history-table tbody td.col-branch {
+            display: flex !important;
+            align-items: center !important;
+            justify-content: space-between !important;
+            padding-bottom: 7px !important;
+            border-bottom: 1px dashed #E2E8F0 !important;
+        }
+
+        .audit-history-table tbody td.col-branch .branch-name-title {
+            font-size: 0.94rem !important;
+            font-weight: 700 !important;
+            color: #0F172A !important;
+        }
+
+        .audit-history-table tbody td.col-date,
+        .audit-history-table tbody td.col-created {
+            display: flex !important;
+            align-items: center !important;
+            justify-content: space-between !important;
+            font-size: 0.82rem !important;
+        }
+
+        .audit-history-table tbody td.col-action {
+            display: block !important;
+            padding-top: 7px !important;
+            border-top: 1px solid #F1F5F9 !important;
+            margin-top: 4px !important;
+        }
+
+        .audit-history-table tbody td.col-action .btn-action-view {
+            width: 100% !important;
+            box-sizing: border-box !important;
+            justify-content: center !important;
+            padding: 8px 14px !important;
+            font-size: 0.88rem !important;
+            background: #2563EB !important;
+            color: #FFFFFF !important;
+            border-color: #2563EB !important;
+            border-radius: 8px !important;
+            box-shadow: 0 2px 8px rgba(37, 99, 235, 0.25) !important;
+        }
+
+        .audit-history-table tbody td.col-action .btn-action-view i {
+            color: #FFFFFF !important;
+        }
+
+        .empty-state-modern {
+            padding: 36px 16px !important;
+        }
+
+        .empty-title {
+            font-size: 1.02rem !important;
+            padding: 0 10px !important;
+        }
+
+        .empty-desc {
+            font-size: 0.84rem !important;
+            padding: 0 10px !important;
+        }
+    }
+
+    .audit-history-table tbody tr {
+        transition: background 0.15s ease;
+    }
+
+    .audit-history-table tbody tr:hover {
+        background: #f8fafc;
+    }
+
+    /* ID Tag */
+    .id-tag {
+        font-weight: 600;
+        color: #64748b;
+        font-size: 0.85rem;
+        background: #f1f5f9;
+        padding: 4px 10px;
+        border-radius: 6px;
+        display: inline-block;
+    }
+
+    /* Branch title */
+    .branch-name-title {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        font-weight: 600;
+        color: #0f172a;
+        font-size: 0.95rem;
+    }
+
+    .branch-name-title .table-mini-icon {
+        color: #3b82f6;
+        width: 16px;
+        height: 16px;
+        flex-shrink: 0;
+    }
+
+    /* Team Pill Badge */
+    .team-badge-pill {
+        display: inline-block;
+        padding: 4px 12px;
+        border-radius: 20px;
+        background: rgba(79, 70, 229, 0.1);
+        color: #4f46e5;
+        font-weight: 600;
+        font-size: 0.85rem;
+        border: 1px solid rgba(79, 70, 229, 0.25);
+    }
+
+    /* Date badge */
+    .date-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        color: #475569;
+        font-size: 0.9rem;
+    }
+
+    .date-badge .table-mini-icon {
+        color: #64748b;
+        width: 15px;
+        height: 15px;
+    }
+
+    /* User Chip */
+    .user-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        color: #334155;
+        font-weight: 500;
+        font-size: 0.9rem;
+    }
+
+    .user-chip-avatar {
+        width: 28px;
+        height: 28px;
+        border-radius: 50%;
+        background: #e0e7ff;
+        color: #4338ca;
+        font-weight: 700;
+        font-size: 0.8rem;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .text-dim-small {
+        color: #64748b;
+        font-size: 0.85rem;
+        white-space: nowrap;
+    }
+
+    /* Action View Button (ดูรายงาน) */
+    .btn-action-view {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+        padding: 7px 16px;
+        border-radius: 8px;
+        background: linear-gradient(135deg, #F1F5F9 0%, #E2E8F0 100%);
+        color: #1e293b;
+        font-weight: 600;
+        font-size: 0.88rem;
+        text-decoration: none;
+        transition: all 0.2s ease;
+        border: 1.5px solid #cbd5e1;
+        white-space: nowrap;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+    }
+
+    .btn-action-view i {
+        width: 15px;
+        height: 15px;
+        color: #3b82f6;
+    }
+
+    .btn-action-view:hover {
+        background: linear-gradient(135deg, #2563eb 0%, #1D4ED8 100%);
+        color: #ffffff;
+        border-color: #2563eb;
+        transform: translateY(-2px);
+        box-shadow: 0 4px 14px rgba(37, 99, 235, 0.25);
+    }
+
+    .btn-action-view:hover i {
+        color: #ffffff;
+    }
+
+    /* AI Themed Filters */
+    .ai-filter-card {
+        background: #FFFFFF !important;
+        border: 1px solid #E2E8F0 !important;
+        border-radius: 14px !important;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.04) !important;
+    }
+
+    .form-select:focus, .form-input:focus {
+        border-color: #DC2626 !important;
+        box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.12) !important;
+    }
+
+    .btn-sheet-secondary:hover {
+        background: #F8FAFC !important;
+        border-color: #94A3B8 !important;
+        color: #0F172A !important;
+        transform: translateY(-1px);
+        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
+    }
+
+    .btn-history-photos-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        background: #EFF6FF;
+        border: 1px solid #BFDBFE;
+        color: #1E40AF;
+        padding: 4px 10px;
+        border-radius: 20px;
+        font-size: 0.82rem;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.15s ease;
+    }
+
+    .btn-history-photos-badge:hover {
+        background: #DBEAFE;
+        color: #1D4ED8;
+        transform: translateY(-1px);
+        box-shadow: 0 2px 6px rgba(30, 64, 175, 0.15);
+    }
+
+    .badge-no-photos {
+        color: #94A3B8;
+        font-size: 0.88rem;
+    }
+</style>
+
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+        if (window.lucide) {
+            lucide.createIcons();
+        }
+    });
+</script>
+{% endblock %}

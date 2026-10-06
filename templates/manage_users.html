@@ -1,0 +1,328 @@
+{% extends "app_layout.html" %}
+
+{% block title %}กำหนดสาขา - LXP Sale Monitor{% endblock %}
+
+{% block breadcrumb %}
+<span class="breadcrumb-item"><a href="{{ url_for('dashboard') }}">หน้าหลัก</a></span>
+<span class="breadcrumb-separator">/</span>
+<span class="breadcrumb-item active">กำหนดสาขา</span>
+{% endblock %}
+
+{% block content %}
+<div class="manage-users-page" style="max-width: 1200px; margin: 0 auto 40px auto; padding: 0 12px;">
+
+    <!-- TOP HEADER -->
+    <div style="margin-bottom: 24px;">
+        <h1 style="font-size: 1.6rem; font-weight: 800; color: #0F172A; margin: 0; display: flex; align-items: center; gap: 10px;">
+            <div style="width: 40px; height: 40px; border-radius: 12px; background: linear-gradient(135deg, #DC2626 0%, #B91C1C 100%); color: #FFFFFF; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 12px rgba(220,38,38,0.25);">
+                <i data-lucide="users" style="width: 22px; height: 22px;"></i>
+            </div>
+            <span>กำหนดสาขา</span>
+        </h1>
+    </div>
+
+    <!-- FILTER & SEARCH BAR -->
+    <div style="background: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 14px; padding: 16px 20px; margin-bottom: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.03);">
+        <form method="GET" action="{{ url_for('admin.admin_users') }}" id="userFilterForm" style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin: 0;">
+            <!-- Search Box -->
+            <div style="position: relative; flex: 1; min-width: 220px;">
+                <i data-lucide="search" style="position: absolute; left: 12px; top: 50%; transform: translateY(-50%); width: 16px; height: 16px; color: #94A3B8;"></i>
+                <input type="text" name="q" value="{{ search_q }}" placeholder="ค้นหา Username (ตัวย่อ 3 หลัก)..." style="width: 100%; box-sizing: border-box; padding: 9px 12px 9px 36px; border: 1px solid #CBD5E1; border-radius: 8px; font-size: 0.9rem; outline: none;" onkeyup="this.value = this.value.toUpperCase()">
+            </div>
+
+            <!-- Filter Branch -->
+            <div style="display: flex; align-items: center; gap: 6px;">
+                <label style="font-size: 0.85rem; font-weight: 700; color: #475569; white-space: nowrap;">สาขา:</label>
+                <select name="branch" onchange="document.getElementById('userFilterForm').submit()" style="padding: 8px 12px; border: 1px solid #CBD5E1; border-radius: 8px; font-size: 0.88rem; font-weight: 600; color: #1E293B; outline: none; cursor: pointer; background: #FFFFFF;">
+                    <option value="ALL" {% if branch_filter == 'ALL' %}selected{% endif %}>ทุกสาขา</option>
+                    {% for b in branches %}
+                    <option value="{{ b }}" {% if branch_filter == b or (branch_filter == 'KORAT' and 'โคราช' in b) %}selected{% endif %}>{{ b }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <button type="submit" style="padding: 8px 16px; background: #1E293B; color: #FFFFFF; border: none; border-radius: 8px; font-size: 0.88rem; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 6px;">
+                <i data-lucide="filter" style="width: 15px; height: 15px;"></i>
+                <span>กรอง</span>
+            </button>
+            {% if search_q or branch_filter != 'ALL' %}
+            <a href="{{ url_for('admin.admin_users') }}" style="font-size: 0.85rem; color: #DC2626; text-decoration: none; font-weight: 600;">ล้างตัวกรอง</a>
+            {% endif %}
+        </form>
+    </div>
+
+    <!-- USERS TABLE CONTAINER -->
+    <div style="background: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 14px; overflow: hidden; box-shadow: 0 4px 16px rgba(0,0,0,0.04);">
+        <div style="overflow-x: auto;">
+            <table style="width: 100%; border-collapse: collapse; text-align: left; font-size: 0.9rem;">
+                <thead>
+                    <tr style="background: #F8FAFC; border-bottom: 1.5px solid #E2E8F0; color: #475569; font-weight: 700; font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.4px;">
+                        <th style="padding: 14px 18px; width: 60px;">#</th>
+                        <th style="padding: 14px 18px;">ชื่อผู้ใช้งาน (Username)</th>
+                        <th style="padding: 14px 18px; width: 110px;">บทบาท</th>
+                        <th style="padding: 14px 18px;">สาขา</th>
+                        <th style="padding: 14px 18px; text-align: center; width: 110px;">จัดการ</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% if users %}
+                    {% for u in users %}
+                    <tr style="border-bottom: 1px solid #F1F5F9; transition: background 0.15s ease;" onmouseover="this.style.background='#F8FAFC'" onmouseout="this.style.background='#FFFFFF'">
+                        <!-- 1. Index -->
+                        <td style="padding: 14px 18px; color: #94A3B8; font-weight: 600;">{{ loop.index }}</td>
+
+                        <!-- 2. Username -->
+                        <td style="padding: 14px 18px;">
+                            <div style="display: flex; align-items: center; gap: 10px;">
+                                <div style="width: 36px; height: 36px; border-radius: 50%; background: #E2E8F0; color: #475569; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 0.95rem;">
+                                    {{ u.username[0] if u.username else '?' }}
+                                </div>
+                                <div>
+                                    <div style="font-weight: 700; color: #0F172A; font-size: 0.95rem; letter-spacing: 0.5px;">
+                                        {{ u.username }}
+                                    </div>
+                                    <div style="font-size: 0.76rem; color: #94A3B8;">สร้างเมื่อ: {{ u.created_at.strftime('%d/%m/%Y') if u.created_at else '-' }}</div>
+                                </div>
+                            </div>
+                        </td>
+
+                        <!-- 3. Role -->
+                        <td style="padding: 14px 18px;">
+                            <span style="display: inline-flex; align-items: center; gap: 4px; padding: 4px 10px; border-radius: 6px; font-size: 0.78rem; font-weight: 700; background: #F1F5F9; color: #475569; border: 1px solid #E2E8F0;">
+                                USER
+                            </span>
+                        </td>
+
+                        <!-- 4. Branch Assignment -->
+                        <td style="padding: 14px 18px;">
+                            <form action="{{ url_for('admin.admin_set_user_branch') }}" method="POST" style="margin: 0; display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                <input type="hidden" name="user_id" value="{{ u.id }}">
+                                <input type="hidden" name="action" value="set_branch">
+                                <select name="branch" style="padding: 7px 12px; border: 1.5px solid #CBD5E1; border-radius: 8px; font-size: 0.88rem; color: #1E293B; background: #FFFFFF; outline: none; min-width: 170px;">
+                                    <option value="">-- ไม่ระบุสาขา --</option>
+                                    {% for b in branches %}
+                                    <option value="{{ b }}" {% if u.branch == b %}selected{% endif %}>{{ b }}</option>
+                                    {% endfor %}
+                                </select>
+                                <button type="submit" style="padding: 7px 14px; background: #1E293B; color: #FFFFFF; border: none; border-radius: 8px; font-size: 0.82rem; font-weight: 600; cursor: pointer; transition: background 0.15s ease;" onmouseover="this.style.background='#334155'" onmouseout="this.style.background='#1E293B'" title="บันทึกสาขา">
+                                    บันทึก
+                                </button>
+                            </form>
+                        </td>
+
+                        <!-- 5. Actions: Reset Password & Delete -->
+                        <td style="padding: 14px 18px; text-align: center;">
+                            <div style="display: inline-flex; align-items: center; justify-content: center; gap: 8px;">
+                                <button type="button" onclick="confirmResetPassword('{{ u.id }}', '{{ u.username }}')" style="background: none; border: none; color: #0284C7; cursor: pointer; padding: 6px; border-radius: 6px; display: inline-flex; align-items: center; justify-content: center; transition: all 0.15s ease;" onmouseover="this.style.background='#E0F2FE'; this.style.color='#0369A1';" onmouseout="this.style.background='none'; this.style.color='#0284C7';" title="รีเซ็ทรหัสผ่าน (สุ่มรหัสผ่านใหม่)">
+                                    <i data-lucide="key-round" style="width: 17px; height: 17px;"></i>
+                                </button>
+                                <button type="button" onclick="confirmDeleteUser('{{ u.id }}', '{{ u.username }}')" style="background: none; border: none; color: #EF4444; cursor: pointer; padding: 6px; border-radius: 6px; display: inline-flex; align-items: center; justify-content: center; transition: background 0.15s ease;" onmouseover="this.style.background='#FEE2E2'" onmouseout="this.style.background='none'" title="ลบผู้ใช้งาน">
+                                    <i data-lucide="trash-2" style="width: 17px; height: 17px;"></i>
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                    {% else %}
+                    <tr>
+                        <td colspan="5" style="padding: 40px; text-align: center; color: #94A3B8;">
+                            <i data-lucide="users" style="width: 36px; height: 36px; margin-bottom: 8px;"></i>
+                            <div>ไม่พบข้อมูลผู้ใช้งานตามเงื่อนไขที่ค้นหา</div>
+                        </td>
+                    </tr>
+                    {% endif %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Hidden Form for User Deletion -->
+<form id="deleteUserForm" action="{{ url_for('admin.admin_delete_user') }}" method="POST" style="display: none;">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <input type="hidden" name="user_id" id="deleteUserIdInput">
+</form>
+
+<script>
+    // SweetAlert2 confirmation before deleting user (preserves user data)
+    function confirmDeleteUser(userId, username) {
+        Swal.fire({
+            title: 'ยืนยันการลบผู้ใช้งาน?',
+            html: `คุณต้องการลบผู้ใช้งาน <b style="color: #DC2626;">"${username}"</b> ออกจากระบบใช่หรือไม่?<br><br>` +
+                  `<div style="font-size: 0.84rem; color: #475569; background: #F8FAFC; border: 1px solid #E2E8F0; padding: 10px 14px; border-radius: 8px; text-align: left; line-height: 1.5;">` +
+                  `<i data-lucide="shield-check" style="width: 16px; height: 16px; vertical-align: middle; color: #10B981; margin-right: 4px;"></i>` +
+                  `<b>รักษาประวัติข้อมูล:</b> รายงาน Morning Audit, รายงานประจำวัน และตารางแม่บ้านที่เคยบันทึกไว้ <b>จะไม่ถูกลบ</b> และยังคงแสดงในประวัติงานตามปกติ` +
+                  `</div>`,
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonColor: '#DC2626',
+            cancelButtonColor: '#64748B',
+            confirmButtonText: 'ยืนยันลบผู้ใช้งาน',
+            cancelButtonText: 'ยกเลิก',
+            reverseButtons: true,
+            focusCancel: true,
+            didOpen: () => {
+                if (window.lucide) lucide.createIcons();
+            }
+        }).then((result) => {
+            if (result.isConfirmed) {
+                document.getElementById('deleteUserIdInput').value = userId;
+                document.getElementById('deleteUserForm').submit();
+            }
+        });
+    }
+
+    // SweetAlert2 for resetting user password with random password generation
+    function confirmResetPassword(userId, username) {
+        Swal.fire({
+            title: 'รีเซ็ทรหัสผ่าน?',
+            html: `คุณต้องการรีเซ็ทรหัสผ่านสำหรับผู้ใช้งาน <b style="color: #0284C7;">"${username}"</b> ใช่หรือไม่?<br><br>` +
+                  `<div style="font-size: 0.84rem; color: #475569; background: #F0F9FF; border: 1px solid #BAE6FD; padding: 10px 14px; border-radius: 8px; text-align: left; line-height: 1.5;">` +
+                  `<i data-lucide="key-round" style="width: 16px; height: 16px; vertical-align: middle; color: #0284C7; margin-right: 4px;"></i>` +
+                  `ระบบจะทำการ<b>สุ่มรหัสผ่านใหม่</b>ขึ้นมาให้ และเมื่อผู้ใช้เข้าสู่ระบบด้วยรหัสนี้ ระบบจะ<b>บังคับให้ผู้ใช้ตั้งรหัสผ่านใหม่</b>ด้วยตนเองทันที` +
+                  `</div>`,
+            icon: 'question',
+            showCancelButton: true,
+            confirmButtonColor: '#0284C7',
+            cancelButtonColor: '#64748B',
+            confirmButtonText: 'ยืนยันรีเซ็ตรหัส',
+            cancelButtonText: 'ยกเลิก',
+            reverseButtons: true,
+            didOpen: () => {
+                if (window.lucide) lucide.createIcons();
+            }
+        }).then((result) => {
+            if (result.isConfirmed) {
+                Swal.fire({
+                    title: 'กำลังสุ่มรหัสผ่านใหม่...',
+                    allowOutsideClick: false,
+                    didOpen: () => {
+                        Swal.showLoading();
+                    }
+                });
+
+                const formData = new FormData();
+                formData.append('csrf_token', '{{ csrf_token() }}');
+                formData.append('user_id', userId);
+
+                fetch("{{ url_for('admin.admin_reset_user_password') }}", {
+                    method: 'POST',
+                    body: formData,
+                    headers: {
+                        'X-Requested-With': 'XMLHttpRequest'
+                    }
+                })
+                .then(res => res.json())
+                .then(data => {
+                    if (data.success) {
+                        Swal.fire({
+                            title: 'รีเซ็ทรหัสผ่านสำเร็จ!',
+                            html: `
+                                <p style="margin-bottom: 8px; color: #334155; font-size: 0.95rem;">
+                                    รหัสผ่านใหม่แบบสุ่มสำหรับผู้ใช้ <b>"${data.username}"</b> คือ:
+                                </p>
+                                <div style="background: #F8FAFC; border: 2px dashed #0284C7; border-radius: 10px; padding: 14px 20px; margin: 16px 0; display: flex; align-items: center; justify-content: center; gap: 12px;">
+                                    <span id="newRandomPasswordText" style="font-family: monospace; font-size: 1.45rem; font-weight: 800; color: #DC2626; letter-spacing: 2px; user-select: all;">
+                                        ${data.temp_password}
+                                    </span>
+                                    <button type="button" onclick="copyPasswordToClipboard('${data.temp_password}')" id="copyPwBtn" style="padding: 6px 12px; background: #0284C7; color: #FFFFFF; border: none; border-radius: 6px; font-size: 0.82rem; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 4px;">
+                                        <i data-lucide="copy" style="width: 14px; height: 14px;"></i>
+                                        <span>คัดลอก</span>
+                                    </button>
+                                </div>
+                                <div style="font-size: 0.84rem; color: #64748B; background: #FFFBEB; border: 1px solid #FDE68A; padding: 10px 14px; border-radius: 8px; text-align: left; line-height: 1.5;">
+                                    <strong style="color: #B45309;">ขั้นตอนสำหรับผู้ใช้งาน:</strong><br>
+                                    1. ส่งรหัสผ่านนี้ให้ผู้ใช้งานล็อกอินเข้าสู่ระบบ<br>
+                                    2. ระบบจะเปิดหน้าบังคับให้ผู้ใช้ตั้งรหัสผ่านใหม่ทันที (ผู้ใช้จะใส่รหัสผ่านสุ่มนี้ในช่องรหัสผ่านปัจจุบัน และกำหนดรหัสผ่านใหม่ด้วยตนเอง)
+                                </div>
+                            `,
+                            icon: 'success',
+                            confirmButtonColor: '#1E293B',
+                            confirmButtonText: 'ตกลง',
+                            didOpen: () => {
+                                if (window.lucide) lucide.createIcons();
+                            }
+                        });
+                    } else {
+                        Swal.fire({
+                            title: 'เกิดข้อผิดพลาด',
+                            text: data.error || 'ไม่สามารถรีเซ็ทรหัสผ่านได้',
+                            icon: 'error',
+                            confirmButtonColor: '#1E293B'
+                        });
+                    }
+                })
+                .catch(err => {
+                    Swal.fire({
+                        title: 'เกิดข้อผิดพลาด',
+                        text: 'ไม่สามารถเชื่อมต่อกับเซิร์ฟเวอร์ได้: ' + err,
+                        icon: 'error',
+                        confirmButtonColor: '#1E293B'
+                    });
+                });
+            }
+        });
+    }
+
+    function copyPasswordToClipboard(text) {
+        function showSuccessAlert() {
+            Swal.fire({
+                title: 'คัดลอกรหัสผ่านสำเร็จ!',
+                html: `คัดลอกรหัสผ่าน <b style="color: #0284C7; font-family: monospace; font-size: 1.35rem; letter-spacing: 1.5px;">"${text}"</b> เรียบร้อยแล้ว<br><br>` +
+                      `<div style="font-size: 0.84rem; color: #475569; background: #F8FAFC; border: 1px solid #E2E8F0; padding: 10px 14px; border-radius: 8px; text-align: left; line-height: 1.5;">` +
+                      `<i data-lucide="info" style="width: 15px; height: 15px; vertical-align: middle; color: #0284C7; margin-right: 4px;"></i>` +
+                      `รหัสผ่านถูกบันทึกลงในคลิปบอร์ดแล้ว สามารถนำไปส่งให้ผู้ใช้งานเพื่อเข้าสู่ระบบและตั้งรหัสผ่านใหม่ได้ทันที` +
+                      `</div>`,
+                icon: 'success',
+                confirmButtonColor: '#1E293B',
+                confirmButtonText: 'ตกลง',
+                timer: 3500,
+                timerProgressBar: true,
+                didOpen: () => {
+                    if (window.lucide) lucide.createIcons();
+                }
+            });
+        }
+
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(text).then(() => {
+                showSuccessAlert();
+            }).catch(() => {
+                fallbackCopy(text);
+            });
+        } else {
+            fallbackCopy(text);
+        }
+    }
+
+    function fallbackCopy(text) {
+        const tempInput = document.createElement('textarea');
+        tempInput.value = text;
+        tempInput.style.position = 'fixed';
+        tempInput.style.left = '-9999px';
+        document.body.appendChild(tempInput);
+        tempInput.select();
+        try {
+            document.execCommand('copy');
+        } catch (e) {}
+        document.body.removeChild(tempInput);
+
+        Swal.fire({
+            title: 'คัดลอกรหัสผ่านสำเร็จ!',
+            html: `คัดลอกรหัสผ่าน <b style="color: #0284C7; font-family: monospace; font-size: 1.35rem; letter-spacing: 1.5px;">"${text}"</b> เรียบร้อยแล้ว`,
+            icon: 'success',
+            confirmButtonColor: '#1E293B',
+            confirmButtonText: 'ตกลง',
+            timer: 3500,
+            timerProgressBar: true
+        });
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+        if (window.lucide) {
+            lucide.createIcons();
+        }
+    });
+</script>
+{% endblock %}

@@ -1,0 +1,170 @@
+{% extends "app_layout.html" %}
+
+{% block title %}จัดการและเพิ่มสาขา - LXP Sale Monitor{% endblock %}
+
+{% block breadcrumb %}
+<span class="breadcrumb-item"><a href="{{ url_for('dashboard') }}">หน้าหลัก</a></span>
+<span class="breadcrumb-separator">/</span>
+<span class="breadcrumb-item active">เพิ่มสาขา</span>
+{% endblock %}
+
+{% block content %}
+<div class="manage-branches-container" style="max-width: 560px; margin: 20px auto 40px auto;">
+    <!-- Main Branch Management Card (White & Red Theme - Original Card Layout) -->
+    <div class="content-card" style="background: #FFFFFF; border: 1.5px solid #FEE2E2; border-radius: 16px; box-shadow: 0 10px 30px rgba(220, 38, 38, 0.08), 0 4px 12px rgba(0, 0, 0, 0.04); overflow: hidden; padding: 0;">
+        
+        <!-- Card Header -->
+        <div style="display: flex; align-items: center; justify-content: space-between; padding: 18px 24px; border-bottom: 1px solid #F1F5F9; background: #FFF5F5;">
+            <div style="display: flex; align-items: center; gap: 12px;">
+                <div style="background: #FEE2E2; color: #DC2626; padding: 10px; border-radius: 12px; display: flex;">
+                    <i data-lucide="map-pin" style="width: 24px; height: 24px;"></i>
+                </div>
+                <div>
+                    <h3 style="margin: 0; font-size: 1.2rem; font-weight: 700; color: #991B1B;">เพิ่มสาขาใหม่</h3>
+                    <p style="margin: 0; font-size: 0.82rem; color: #7F1D1D;">จัดการรายชื่อสาขาในระบบ LXP Monitor</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Add Branch Form -->
+        <form action="{{ url_for('admin_add_branch') }}" method="POST" style="padding: 24px; margin: 0;">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <div style="margin-bottom: 20px;">
+                <label for="branch_name" style="display: block; font-size: 0.92rem; font-weight: 700; color: #1E293B; margin-bottom: 8px;">
+                    ชื่อสาขาที่ต้องการเพิ่ม
+                </label>
+                <div style="position: relative;">
+                    <input type="text" id="branch_name" name="branch_name" required class="form-input" 
+                           style="width: 100%; box-sizing: border-box; background: #FFFFFF; border: 1.5px solid #CBD5E1; border-radius: 10px; padding: 11px 16px; color: #0F172A; font-size: 0.95rem; font-weight: 500; outline: none; transition: border-color 0.2s ease;" 
+                           onfocus="this.style.borderColor='#DC2626'" onblur="this.style.borderColor='#CBD5E1'">
+                </div>
+            </div>
+
+            <!-- Active branches preview -->
+            <div style="margin-bottom: 20px;">
+                <label style="display: block; font-size: 0.85rem; font-weight: 700; color: #334155; margin-bottom: 8px;">
+                    สาขาในระบบปัจจุบัน ({{ branches|length }} สาขา):
+                </label>
+                <div style="display: flex; flex-wrap: wrap; gap: 8px; max-height: 160px; overflow-y: auto; padding: 12px; background: #FFF5F5; border-radius: 10px; border: 1px solid #FECACA;">
+                    {% for b in branches %}
+                    <span style="display: inline-flex; align-items: center; font-size: 0.82rem; font-weight: 600; background: #FFFFFF; color: #991B1B; border: 1px solid #FECACA; border-radius: 6px; padding: 5px 10px; box-shadow: 0 1px 3px rgba(0,0,0,0.04);">
+                        {{ b }}
+                    </span>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <!-- Quick Delete Branch Select Dropdown (Expandable) -->
+            <div id="deleteBranchSelectContainer" style="display: none; margin-bottom: 20px; padding: 14px; background: #FEF2F2; border: 1.5px dashed #F87171; border-radius: 10px;">
+                <label style="display: block; font-size: 0.86rem; font-weight: 700; color: #991B1B; margin-bottom: 8px;">
+                    เลือกสาขาที่ต้องการลบออกจากระบบ:
+                </label>
+                <div style="display: flex; gap: 8px;">
+                    <select id="quickBranchSelect" class="form-input" style="flex: 1; background: #FFFFFF; border: 1px solid #FCA5A5; border-radius: 8px; padding: 9px 12px; color: #991B1B; font-size: 0.92rem; font-weight: 600;">
+                        <option value="">-- เลือกสาขาที่ต้องการลบ --</option>
+                        {% for b in branches %}
+                        <option value="{{ b }}">{{ b }}</option>
+                        {% endfor %}
+                    </select>
+                    <button type="button" onclick="confirmDeleteFromSelect()" style="background: #DC2626; border: none; color: #FFFFFF; padding: 9px 16px; border-radius: 8px; font-weight: 600; font-size: 0.9rem; cursor: pointer; display: inline-flex; align-items: center; gap: 6px;">
+                        <i data-lucide="trash-2" style="width: 15px; height: 15px;"></i> ลบ
+                    </button>
+                </div>
+            </div>
+
+            <!-- Action Footer: Delete on Bottom-Left, Save on Right -->
+            <div style="display: flex; justify-content: space-between; align-items: center; padding-top: 16px; border-top: 1px solid #F1F5F9; gap: 10px;">
+                <!-- Bottom-Left Delete Button -->
+                <button type="button" onclick="toggleDeleteSelect()" class="btn-modal-delete-left" style="background: #FEF2F2; border: 1.5px solid #F87171; color: #DC2626; padding: 10px 16px; border-radius: 10px; font-weight: 600; font-size: 0.9rem; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; transition: all 0.15s ease;">
+                    <i data-lucide="trash-2" style="width: 16px; height: 16px;"></i>
+                    <span>ลบสาขา</span>
+                </button>
+
+                <!-- Bottom-Right Save Button -->
+                <button type="submit" style="background: linear-gradient(135deg, #EF4444, #DC2626); border: none; color: #FFFFFF; padding: 10px 22px; border-radius: 10px; cursor: pointer; font-weight: 600; font-size: 0.92rem; display: inline-flex; align-items: center; gap: 6px; box-shadow: 0 4px 12px rgba(220, 38, 38, 0.3);">
+                    <i data-lucide="plus-circle" style="width: 16px; height: 16px;"></i>
+                    <span>บันทึกสาขาใหม่</span>
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Hidden Form for Branch Deletion -->
+<form id="deleteBranchForm" action="{{ url_for('admin_delete_branch') }}" method="POST" style="display: none;">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <input type="hidden" name="branch_name" id="deleteBranchInput">
+</form>
+
+<script>
+    function toggleDeleteSelect() {
+        const selectBox = document.getElementById('deleteBranchSelectContainer');
+        if (selectBox) {
+            selectBox.style.display = (selectBox.style.display === 'none' ? 'block' : 'none');
+            if (window.lucide) lucide.createIcons();
+            if (selectBox.style.display === 'block') {
+                selectBox.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            }
+        }
+    }
+
+    function confirmDeleteFromSelect() {
+        const branchSelect = document.getElementById('quickBranchSelect');
+        if (!branchSelect || !branchSelect.value) {
+            Swal.fire({
+                title: 'กรุณาเลือกสาขา',
+                text: 'กรุณาเลือกสาขาที่ต้องการลบจากรายการ',
+                icon: 'info',
+                confirmButtonColor: '#DC2626',
+                confirmButtonText: 'ตกลง'
+            });
+            return;
+        }
+        confirmDeleteBranch(branchSelect.value);
+    }
+
+    // Double confirmation before deleting using SweetAlert2
+    function confirmDeleteBranch(branchName) {
+        if (!branchName) return;
+
+        // SweetAlert2 Confirmation 1 (แจ้งเตือนครั้งที่ 1 - ปุ่ม 'ใช่')
+        Swal.fire({
+            title: 'ยืนยันการลบสาขา?',
+            html: `คุณต้องการลบสาขา <b style="color: #DC2626;">"${branchName}"</b> ใช่หรือไม่?`,
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonColor: '#DC2626',
+            cancelButtonColor: '#64748B',
+            confirmButtonText: 'ใช่',
+            cancelButtonText: 'ยกเลิก',
+            reverseButtons: true,
+            focusCancel: true
+        }).then((result1) => {
+            if (result1.isConfirmed) {
+                // SweetAlert2 Confirmation 2 (แจ้งเตือนครั้งที่ 2 - '⚠️ ยืนยันอีกครั้ง')
+                Swal.fire({
+                    title: '⚠️ ยืนยันอีกครั้ง',
+                    html: `การลบสาขา <b>"${branchName}"</b> จะทำให้สาขานี้ไม่ปรากฏในระบบอีกต่อไป<br><br><span style="color: #DC2626; font-weight: 700;">คุณแน่ใจที่จะดำเนินการลบสาขานี้จริงๆ หรือไม่?</span>`,
+                    icon: 'error',
+                    showCancelButton: true,
+                    confirmButtonColor: '#DC2626',
+                    cancelButtonColor: '#64748B',
+                    confirmButtonText: 'ยืนยันลบสาขาถาวร',
+                    cancelButtonText: 'ยกเลิก',
+                    reverseButtons: true,
+                    focusCancel: true
+                }).then((result2) => {
+                    if (result2.isConfirmed) {
+                        const deleteInput = document.getElementById('deleteBranchInput');
+                        const deleteForm = document.getElementById('deleteBranchForm');
+                        if (deleteInput && deleteForm) {
+                            deleteInput.value = branchName;
+                            deleteForm.submit();
+                        }
+                    }
+                });
+            }
+        });
+    }
+</script>
+{% endblock %}

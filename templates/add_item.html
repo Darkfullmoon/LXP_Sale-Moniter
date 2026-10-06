@@ -1,0 +1,126 @@
+{% extends "app_layout.html" %}
+
+{% block title %}1. เพิ่มรายการ - LXP Sale Monitor{% endblock %}
+
+{% block breadcrumb %}
+    <a href="{{ url_for('dashboard') }}" class="breadcrumb-link">หน้าหลัก</a>
+    <span class="breadcrumb-separator">/</span>
+    <span class="breadcrumb-item">1. เพิ่มรายการ</span>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1 class="page-title">1. เพิ่มรายการสินค้าเพื่อการตรวจสอบ</h1>
+        <p class="page-subtitle">กรอกรายละเอียดรายการสินค้าเพื่อส่งให้ Admin ตรวจสอบและอนุมัติ</p>
+    </div>
+</div>
+
+<div class="form-container-card">
+    <form action="{{ url_for('add_item') }}" method="POST" class="standard-form">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <div class="form-grid">
+            <!-- Item Code -->
+            <div class="form-group">
+                <label for="item_code" class="form-label">
+                    <span>รหัสรายการ / สินค้า (Item Code)</span>
+                    <span class="badge-hint">ตัวพิมพ์ใหญ่ เช่น LXP-2001</span>
+                </label>
+                <div class="input-wrapper">
+                    <i data-lucide="tag" class="input-icon"></i>
+                    <input 
+                        type="text" 
+                        id="item_code" 
+                        name="item_code" 
+                        class="form-input uppercase-only" 
+                        placeholder="เช่น LXP-1004, PROD-01" 
+                        required 
+                        maxlength="30"
+                    >
+                </div>
+            </div>
+
+            <!-- Category -->
+            <div class="form-group">
+                <label for="category" class="form-label">
+                    <span>หมวดหมู่สินค้า (Category)</span>
+                </label>
+                <div class="input-wrapper">
+                    <i data-lucide="folder" class="input-icon"></i>
+                    <select id="category" name="category" class="form-select" required>
+                        <option value="" disabled selected>-- เลือกหมวดหมู่ --</option>
+                        <option value="อุปกรณ์อิเล็กทรอนิกส์">อุปกรณ์อิเล็กทรอนิกส์ (Electronics)</option>
+                        <option value="อุปกรณ์แสดงผล">อุปกรณ์แสดงผล (Display & Module)</option>
+                        <option value="อุปกรณ์สายสัญญาณ">อุปกรณ์สายสัญญาณ (Cables & Wiring)</option>
+                        <option value="อุปกรณ์เครือข่าย">อุปกรณ์เครือข่าย (Networking)</option>
+                        <option value="อะไหล่และชิ้นส่วน">อะไหล่และชิ้นส่วน (Spare Parts)</option>
+                        <option value="อื่นๆ">อื่นๆ (Others)</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- Item Name -->
+            <div class="form-group full-width">
+                <label for="item_name" class="form-label">
+                    <span>ชื่อรายการสินค้า (Item Name / Description)</span>
+                </label>
+                <div class="input-wrapper">
+                    <i data-lucide="package" class="input-icon"></i>
+                    <input 
+                        type="text" 
+                        id="item_name" 
+                        name="item_name" 
+                        class="form-input" 
+                        placeholder="เช่น โมดูลวัดแรงดันไฟฟ้าระบบดิจิตอล High Precision" 
+                        required
+                    >
+                </div>
+            </div>
+
+            <!-- Quantity -->
+            <div class="form-group">
+                <label for="quantity" class="form-label">
+                    <span>จำนวน (Quantity)</span>
+                    <span class="badge-hint">ตัวเลข 0-9</span>
+                </label>
+                <div class="input-wrapper">
+                    <i data-lucide="hash" class="input-icon"></i>
+                    <input 
+                        type="number" 
+                        id="quantity" 
+                        name="quantity" 
+                        class="form-input numeric-only" 
+                        value="1" 
+                        min="1" 
+                        required
+                    >
+                </div>
+            </div>
+
+            <!-- Submitter Info -->
+            <div class="form-group">
+                <label class="form-label">
+                    <span>ผู้ทำรายการส่งตรวจ</span>
+                </label>
+                <div class="input-wrapper">
+                    <i data-lucide="user-check" class="input-icon"></i>
+                    <input 
+                        type="text" 
+                        class="form-input readonly-input" 
+                        value="{{ current_user.username }}" 
+                        readonly
+                    >
+                </div>
+            </div>
+        </div>
+
+        <div class="form-actions">
+            <a href="{{ url_for('dashboard') }}" class="btn-secondary">ยกเลิก</a>
+            <button type="submit" class="btn-primary">
+                <i data-lucide="send"></i>
+                <span>ส่งรายการเพื่อรอการตรวจสอบ</span>
+            </button>
+        </div>
+    </form>
+</div>
+{% endblock %}

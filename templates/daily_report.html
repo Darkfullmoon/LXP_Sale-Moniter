@@ -1,0 +1,734 @@
+{% extends "app_layout.html" %}
+
+{% block title %}รายงานการปฏิบัติงานสำนักงานขาย - FM-MS-224 Rev.00{% endblock %}
+
+{% block breadcrumb %}
+<span class="breadcrumb-item"><a href="{{ url_for('dashboard') }}">หน้าหลัก</a></span>
+<span class="breadcrumb-separator">/</span>
+<span class="breadcrumb-item active">รายงานการปฏิบัติงานสำนักงานขาย (FM-MS-224 Rev.00)</span>
+{% endblock %}
+
+{% block content %}
+<div class="sheet-form-page-container">
+    {% if current_user.role == 'ADMIN' %}
+    <div style="display: flex; justify-content: flex-end; margin-bottom: 12px;">
+        <a href="{{ url_for('daily_report_history') }}" class="btn-sheet-secondary">
+            <i data-lucide="history"></i> ดูประวัติรายงาน
+        </a>
+    </div>
+    {% endif %}
+
+    <!-- Official White Sheet Container -->
+    <div class="sheet-paper-container">
+        <!-- Locked Alert for Regular Users -->
+        <div id="dailyReportLockedBanner" style="{% if not (already_submitted_report and current_user.role != 'ADMIN') %}display: none;{% else %}display: flex;{% endif %} margin-bottom: 16px; padding: 12px 18px; border-radius: 10px; background: #FFFBEB; border: 1.5px solid #FCD34D; color: #92400E; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;">
+            <div style="display: flex; align-items: center; gap: 10px;">
+                <i data-lucide="lock" style="width: 22px; height: 22px; color: #D97706; flex-shrink: 0;"></i>
+                <div>
+                    <div style="font-weight: 700; font-size: 0.95rem;" id="dailyLockedTitle">{% if already_submitted_report %}สาขา {{ already_submitted_report.branch }} ได้ทำการส่งรายงานการปฏิบัติงานประจำวันที่ {{ already_submitted_report.report_date }} เรียบร้อยแล้ว{% else %}สาขานี้ได้ทำการส่งรายงานการปฏิบัติงานประจำวันนี้เรียบร้อยแล้ว{% endif %}</div>
+                    <div style="font-size: 0.82rem; color: #B45309;" id="dailyLockedDesc">ข้อมูลรายงานถูกส่งเข้าระบบเรียบร้อยแล้ว เพื่อรักษาความถูกต้องและความโปร่งใสของข้อมูล</div>
+                </div>
+            </div>
+            <a href="{% if already_submitted_report %}{{ url_for('daily_report.daily_report_detail', report_id=already_submitted_report.id) }}{% else %}#{% endif %}" id="dailyLockedLink" class="btn-sheet-secondary" style="font-size: 0.82rem; padding: 6px 12px; background: #FFFFFF; border: 1px solid #FCD34D; color: #92400E; text-decoration: none; border-radius: 6px; font-weight: 600; display: inline-flex; align-items: center; gap: 4px;">
+                <span>ดูรายงานการปฏิบัติงาน</span> &raquo;
+            </a>
+        </div>
+
+        <form action="{{ url_for('daily_report') }}" method="POST" id="dailyReportSheetForm"
+            onsubmit="prepareSignatures()">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+            <!-- HEADER SECTION -->
+            <div class="sheet-header-section" style="margin-bottom: 14px;">
+                <div class="daily-head-line">
+                    <div class="daily-head-group">
+                        <strong>รายงานการปฏิบัติงานสำนักงานขาย</strong>
+                        <div class="daily-head-field">
+                            <span class="sheet-field-label">สาขา</span>
+                            <select name="branch" id="branchMainInput" class="sheet-select-dotted" required
+                                style="min-width: 170px; text-align: left;">
+                                <option value="">กรุณาเลือกสาขา</option>
+                                {% for b in branches %}
+                                <option value="{{ b }}" {% if selected_branch==b %}selected{% endif %}>{{ b }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="daily-head-field">
+                        <span class="sheet-field-label">วันที่</span>
+                        <input type="date" name="report_date" id="reportDateInput" class="sheet-input-dotted"
+                            value="{{ selected_date if selected_date else today }}" required
+                            style="min-width: 140px; text-align: center;">
+                    </div>
+                </div>
+            </div>
+
+            <!-- TABLE CONTAINER WITH SHARP CRISP BLACK BORDERS -->
+            <div class="sheet-table-wrapper" style="margin-top: 8px;">
+                <table class="daily-sheet-table">
+                    <!-- ================= SECTION: สรุปงานประจำวัน ================= -->
+                    <thead>
+                        <tr class="daily-sec-title-row">
+                            <th colspan="4" class="daily-sec-title-cell">
+                                สรุปงานประจำวัน
+                                <span class="sec-title-sub">สรุป &nbsp;(รายละเอียด)</span>
+                            </th>
+                        </tr>
+                        <tr class="daily-col-head-row">
+                            <th colspan="3" style="text-align: left; padding-left: 14px;">สรุป &nbsp;(รายละเอียด)</th>
+                            <th style="text-align: center;">สรุป &nbsp;(รายละเอียด)</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <!-- Section 2 Content Row -->
+                        <tr>
+                            <!-- Left 3 Columns: Customer Statistics & Additional Tasks -->
+                            <td colspan="3" class="daily-stats-container-cell">
+                                <div class="daily-stat-list">
+                                    <div class="daily-stat-row">
+                                        <span>จำนวนลูกค้าที่ได้จาก Call center</span>
+                                        <div class="stat-input-group">
+                                            <input type="number" name="stat_call_center"
+                                                class="sheet-inline-input input-short" placeholder="0" min="0">
+                                            <span>ราย</span>
+                                        </div>
+                                    </div>
+
+                                    <div class="daily-stat-row">
+                                        <span>จำนวนลูกค้า Walk in</span>
+                                        <div class="stat-input-group">
+                                            <input type="number" name="stat_walk_in"
+                                                class="sheet-inline-input input-short" placeholder="0" min="0">
+                                            <span>ราย</span>
+                                        </div>
+                                    </div>
+
+                                    <div class="daily-stat-row">
+                                        <span>จำนวนลูกค้านัดหมายวันนี้</span>
+                                        <div class="stat-input-group">
+                                            <input type="number" name="stat_appointment"
+                                                class="sheet-inline-input input-short" placeholder="0" min="0">
+                                            <span>ราย</span>
+                                        </div>
+                                    </div>
+
+                                    <div class="daily-stat-row">
+                                        <span>จำนวนลูกค้าจอง</span>
+                                        <div class="stat-input-group">
+                                            <input type="number" name="stat_booking"
+                                                class="sheet-inline-input input-short" placeholder="0" min="0">
+                                            <span>ราย</span>
+                                        </div>
+                                    </div>
+
+                                    <div class="daily-stat-row" style="margin-bottom: 2px;">
+                                        <strong>จำนวน Call</strong>
+                                    </div>
+
+                                    <div class="daily-stat-row">
+                                        <span>ผู้จัดการสำนักงานขาย</span>
+                                        <div class="stat-input-group">
+                                            <input type="number" name="stat_call_manager"
+                                                class="sheet-inline-input input-short" placeholder="0" min="0">
+                                            <span>ราย</span>
+                                        </div>
+                                    </div>
+
+                                    <div class="daily-stat-row">
+                                        <span>เจ้าหน้าที่ขายอาวุโส</span>
+                                        <div class="stat-input-group">
+                                            <input type="number" name="stat_call_senior"
+                                                class="sheet-inline-input input-short" placeholder="0" min="0">
+                                            <span>ราย</span>
+                                        </div>
+                                    </div>
+
+                                    <div class="daily-additional-tasks-box">
+                                        <div style="font-weight: 600; margin-bottom: 6px;">
+                                            งานเพิ่มเติมระหว่างวันที่ต้องทำ</div>
+                                        <textarea name="additional_tasks" class="daily-task-textarea" rows="4"
+                                            placeholder="พิมพ์งานเพิ่มเติมระหว่างวันที่ต้องทำ..."></textarea>
+                                    </div>
+                                </div>
+                            </td>
+
+                            <!-- Right Column: Dynamic Daily Summary Table (Exact same format as Morning Brief) -->
+                            <td class="daily-textarea-cell"
+                                style="vertical-align: top; background: #FFFFFF; padding: 0;">
+                                <div class="mb-container">
+                                    <div class="mb-mobile-title">สรุป &nbsp;(รายละเอียด)</div>
+                                    <table class="mb-table" id="dailySummaryTable">
+                                        <tbody id="dailySummaryBody">
+                                            <!-- Dynamic Rows inserted here by JS -->
+                                        </tbody>
+                                    </table>
+                                    <div class="mb-actions-bar"
+                                        style="padding: 8px 10px; background: #F8FAFC; border-top: 1px dashed #CBD5E1; display: flex; justify-content: flex-start; align-items: center;">
+                                        <button type="button" class="btn-add-mb-row" onclick="addDailySummaryRow()">
+                                            <i data-lucide="plus" style="width: 15px; height: 15px;"></i> เพิ่มชื่อย่อ
+                                        </button>
+                                    </div>
+                                    <!-- Hidden textarea to store and sync compiled daily_summary -->
+                                    <textarea name="daily_summary" id="dailySummaryHidden"
+                                        style="display: none;"></textarea>
+                                </div>
+                            </td>
+                        </tr>
+
+                        <!-- Section 2 Signatures Header -->
+                        <tr class="daily-sign-head-row">
+                            <td colspan="3" class="daily-sign-col-left"><strong>พนักงานเซ็นรับทราบ</strong></td>
+                            <td class="daily-sign-col-right"><strong>ผู้จัดการสำนักงานขาย</strong></td>
+                        </tr>
+
+                        <!-- Section 2 Signatures Body -->
+                        <tr class="daily-signatures-row">
+                            <td colspan="3" class="daily-sign-body-left">
+                                <div class="mobile-sign-section-header">
+                                    <strong>พนักงานเซ็นรับทราบ</strong>
+                                </div>
+                                <div class="sign-staff-row-form">
+                                    <span class="staff-idx">1)</span>
+                                    <div class="sig-slot-container" id="slot_staffManagerSigS2">
+                                        <input type="hidden" name="staff_manager_s2_sig" id="staffManagerSigS2" value="">
+                                        <button type="button" class="btn-trigger-sig-popup" onclick="openSignatureModal('staffManagerSigS2', 'ลายเซ็น: ผู้จัดการสำนักงานขาย', 'slot_staffManagerSigS2')">
+                                            <i data-lucide="pen-tool"></i> <span>กดเพื่อเซ็นลายเซ็น</span>
+                                        </button>
+                                        <div class="sig-signed-preview" style="display: none;">
+                                            <img src="" alt="ลายเซ็น" class="sig-thumb-img">
+                                            <div class="sig-thumb-actions">
+                                                <button type="button" class="btn-sig-thumb-edit" onclick="openSignatureModal('staffManagerSigS2', 'ลายเซ็น: ผู้จัดการสำนักงานขาย', 'slot_staffManagerSigS2')" title="เซ็นใหม่">
+                                                    <i data-lucide="edit-3"></i>
+                                                </button>
+                                                <button type="button" class="btn-sig-thumb-remove" onclick="removeSlotSignature('staffManagerSigS2', 'slot_staffManagerSigS2')" title="ลบลายเซ็น">
+                                                    <i data-lucide="trash-2"></i>
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <input type="text" name="staff_manager_s2" class="sheet-inline-input sign-input"
+                                        placeholder="ชื่อ-นามสกุล...">
+                                    <span class="staff-pos-label">ผู้จัดการสำนักงานขาย</span>
+                                </div>
+                                <div class="sign-staff-row-form">
+                                    <span class="staff-idx">2)</span>
+                                    <div class="sig-slot-container" id="slot_staffSeniorSaleSigS2">
+                                        <input type="hidden" name="staff_senior_sale_s2_sig" id="staffSeniorSaleSigS2" value="">
+                                        <button type="button" class="btn-trigger-sig-popup" onclick="openSignatureModal('staffSeniorSaleSigS2', 'ลายเซ็น: เจ้าหน้าที่ขายอาวุโส', 'slot_staffSeniorSaleSigS2')">
+                                            <i data-lucide="pen-tool"></i> <span>กดเพื่อเซ็นลายเซ็น</span>
+                                        </button>
+                                        <div class="sig-signed-preview" style="display: none;">
+                                            <img src="" alt="ลายเซ็น" class="sig-thumb-img">
+                                            <div class="sig-thumb-actions">
+                                                <button type="button" class="btn-sig-thumb-edit" onclick="openSignatureModal('staffSeniorSaleSigS2', 'ลายเซ็น: เจ้าหน้าที่ขายอาวุโส', 'slot_staffSeniorSaleSigS2')" title="เซ็นใหม่">
+                                                    <i data-lucide="edit-3"></i>
+                                                </button>
+                                                <button type="button" class="btn-sig-thumb-remove" onclick="removeSlotSignature('staffSeniorSaleSigS2', 'slot_staffSeniorSaleSigS2')" title="ลบลายเซ็น">
+                                                    <i data-lucide="trash-2"></i>
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <input type="text" name="staff_senior_sale_s2" class="sheet-inline-input sign-input"
+                                        placeholder="ชื่อ-นามสกุล...">
+                                    <span class="staff-pos-label">เจ้าหน้าที่ขายอาวุโส</span>
+                                </div>
+                                <div class="sign-staff-row-form">
+                                    <span class="staff-idx">3)</span>
+                                    <div class="sig-slot-container" id="slot_staffCoordinatorSigS2">
+                                        <input type="hidden" name="staff_coordinator_s2_sig" id="staffCoordinatorSigS2" value="">
+                                        <button type="button" class="btn-trigger-sig-popup" onclick="openSignatureModal('staffCoordinatorSigS2', 'ลายเซ็น: เจ้าหน้าที่ประสานงานขายและการตลาด', 'slot_staffCoordinatorSigS2')">
+                                            <i data-lucide="pen-tool"></i> <span>กดเพื่อเซ็นลายเซ็น</span>
+                                        </button>
+                                        <div class="sig-signed-preview" style="display: none;">
+                                            <img src="" alt="ลายเซ็น" class="sig-thumb-img">
+                                            <div class="sig-thumb-actions">
+                                                <button type="button" class="btn-sig-thumb-edit" onclick="openSignatureModal('staffCoordinatorSigS2', 'ลายเซ็น: เจ้าหน้าที่ประสานงานขายและการตลาด', 'slot_staffCoordinatorSigS2')" title="เซ็นใหม่">
+                                                    <i data-lucide="edit-3"></i>
+                                                </button>
+                                                <button type="button" class="btn-sig-thumb-remove" onclick="removeSlotSignature('staffCoordinatorSigS2', 'slot_staffCoordinatorSigS2')" title="ลบลายเซ็น">
+                                                    <i data-lucide="trash-2"></i>
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <input type="text" name="staff_coordinator_s2" class="sheet-inline-input sign-input"
+                                        placeholder="ชื่อ-นามสกุล...">
+                                    <span class="staff-pos-label">เจ้าหน้าที่ประสานงานขายและการตลาด</span>
+                                </div>
+                                <div class="sign-staff-row-form">
+                                    <span class="staff-idx">4)</span>
+                                    <div class="sig-slot-container" id="slot_staffArchitectSigS2">
+                                        <input type="hidden" name="staff_architect_s2_sig" id="staffArchitectSigS2" value="">
+                                        <button type="button" class="btn-trigger-sig-popup" onclick="openSignatureModal('staffArchitectSigS2', 'ลายเซ็น: สถาปนิกปรับแบบ', 'slot_staffArchitectSigS2')">
+                                            <i data-lucide="pen-tool"></i> <span>กดเพื่อเซ็นลายเซ็น</span>
+                                        </button>
+                                        <div class="sig-signed-preview" style="display: none;">
+                                            <img src="" alt="ลายเซ็น" class="sig-thumb-img">
+                                            <div class="sig-thumb-actions">
+                                                <button type="button" class="btn-sig-thumb-edit" onclick="openSignatureModal('staffArchitectSigS2', 'ลายเซ็น: สถาปนิกปรับแบบ', 'slot_staffArchitectSigS2')" title="เซ็นใหม่">
+                                                    <i data-lucide="edit-3"></i>
+                                                </button>
+                                                <button type="button" class="btn-sig-thumb-remove" onclick="removeSlotSignature('staffArchitectSigS2', 'slot_staffArchitectSigS2')" title="ลบลายเซ็น">
+                                                    <i data-lucide="trash-2"></i>
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <input type="text" name="staff_architect_s2" class="sheet-inline-input sign-input"
+                                        placeholder="ชื่อ-นามสกุล...">
+                                    <span class="staff-pos-label">สถาปนิกปรับแบบ</span>
+                                </div>
+                            </td>
+                            <td class="daily-sign-body-right">
+                                <div class="mobile-sign-section-header">
+                                    <strong>ผู้จัดการสำนักงานขาย</strong>
+                                </div>
+                                <div class="sign-box-center">
+                                    <div class="sig-slot-container sig-slot-manager" id="slot_managerSigInput_S2">
+                                        <input type="hidden" name="manager_sig_s2" id="managerSigInput_S2" value="">
+                                        <button type="button" class="btn-trigger-sig-popup btn-manager-sig" onclick="openSignatureModal('managerSigInput_S2', 'ลายเซ็น: ผู้จัดการสำนักงานขาย', 'slot_managerSigInput_S2')">
+                                            <i data-lucide="pen-tool"></i> <span>กดเพื่อเซ็นลายเซ็น</span>
+                                        </button>
+                                        <div class="sig-signed-preview" style="display: none;">
+                                            <img src="" alt="ลายเซ็น" class="sig-thumb-img sig-thumb-manager">
+                                            <div class="sig-thumb-actions">
+                                                <button type="button" class="btn-sig-thumb-edit" onclick="openSignatureModal('managerSigInput_S2', 'ลายเซ็น: ผู้จัดการสำนักงานขาย', 'slot_managerSigInput_S2')" title="เซ็นใหม่">
+                                                    <i data-lucide="edit-3"></i>
+                                                </button>
+                                                <button type="button" class="btn-sig-thumb-remove" onclick="removeSlotSignature('managerSigInput_S2', 'slot_managerSigInput_S2')" title="ลบลายเซ็น">
+                                                    <i data-lucide="trash-2"></i>
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="sign-bracket-line" style="margin-top: 8px;">
+                                        (&nbsp; <input type="text" name="manager_name_s2"
+                                            class="sheet-inline-input sign-input-center" placeholder="ชื่อ-นามสกุล...">
+                                        &nbsp;)
+                                    </div>
+                                </div>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- FOOTER REVISION CODE -->
+            <div class="sheet-rev-code-right" style="margin-top: 10px;">
+                <span>FM-MS-224 Rev.00</span>
+            </div>
+
+            <!-- SUBMIT ACTION BAR -->
+            <div class="sheet-submit-action-bar" style="margin-top: 24px;">
+                <div>
+                    <span style="color: #475569; font-size: 0.9rem;">
+                        <i data-lucide="user-check"></i> ผู้บันทึก: <strong>{{ current_user.username }}</strong>
+                    </span>
+                </div>
+                <div class="submit-btns-right">
+                    <a href="{{ url_for('dashboard') }}" class="btn-sheet-cancel">ยกเลิก</a>
+                    <button type="submit" class="btn-sheet-submit" id="dailySubmitBtn">
+                        <i data-lucide="save"></i> บันทึกรายงานการปฏิบัติงาน
+                    </button>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- ================= SIGNATURE DRAWING MODAL ================= -->
+<div class="sig-modal-overlay" id="sigModalOverlay" style="display: none;">
+    <div class="sig-modal-dialog">
+        <div class="sig-modal-header">
+            <div class="sig-modal-title">
+                <i data-lucide="pen-tool"></i> <span id="sigModalTitle">เซ็นลายเซ็น</span>
+            </div>
+            <button type="button" class="btn-close-sig-modal" onclick="closeSignatureModal()" title="ปิด">
+                <i data-lucide="x"></i>
+            </button>
+        </div>
+        <div class="sig-modal-body">
+            <div class="sig-modal-canvas-wrapper">
+                <canvas id="sigModalCanvas" class="sig-modal-canvas" width="500" height="220"></canvas>
+                <div class="sig-modal-guide-line">
+                    <span>เซ็นลายเซ็นตรงนี้</span>
+                </div>
+            </div>
+            <div class="sig-modal-hint">
+                <i data-lucide="info" style="width: 14px; height: 14px;"></i>
+                <span>ใช้นิ้วมือ ปากกาสไตลัส หรือเมาส์เพื่อเซ็นชื่อ</span>
+            </div>
+        </div>
+        <div class="sig-modal-footer">
+            <button type="button" class="btn-sig-modal-clear" onclick="clearModalSignature()">
+                <i data-lucide="rotate-ccw"></i> ล้างลายเซ็น
+            </button>
+            <div class="sig-modal-footer-right">
+                <button type="button" class="btn-sig-modal-cancel" onclick="closeSignatureModal()">
+                    ยกเลิก
+                </button>
+                <button type="button" class="btn-sig-modal-save" onclick="saveModalSignature()">
+                    <i data-lucide="check"></i> บันทึกลายเซ็น
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // ================= SIGNATURE MODAL MANAGEMENT =================
+    let currentSigTargetInputId = null;
+    let currentSigTargetSlotId = null;
+    let modalCanvas = null;
+    let modalCtx = null;
+    let modalHasDrawn = false;
+
+    function initSignatureModalCanvas() {
+        modalCanvas = document.getElementById('sigModalCanvas');
+        if (!modalCanvas) return;
+        modalCtx = modalCanvas.getContext('2d');
+        modalCtx.strokeStyle = "#0F172A";
+        modalCtx.lineWidth = 3.0;
+        modalCtx.lineCap = "round";
+        modalCtx.lineJoin = "round";
+
+        let isDrawing = false;
+
+        function getPos(e) {
+            const rect = modalCanvas.getBoundingClientRect();
+            const scaleX = modalCanvas.width / rect.width;
+            const scaleY = modalCanvas.height / rect.height;
+            let clientX, clientY;
+            if (e.touches && e.touches.length > 0) {
+                clientX = e.touches[0].clientX;
+                clientY = e.touches[0].clientY;
+            } else {
+                clientX = e.clientX;
+                clientY = e.clientY;
+            }
+            return {
+                x: (clientX - rect.left) * scaleX,
+                y: (clientY - rect.top) * scaleY
+            };
+        }
+
+        function startDrawing(e) {
+            isDrawing = true;
+            modalHasDrawn = true;
+            const pos = getPos(e);
+            modalCtx.beginPath();
+            modalCtx.moveTo(pos.x, pos.y);
+            if (e.cancelable) e.preventDefault();
+            e.stopPropagation();
+        }
+
+        function draw(e) {
+            if (!isDrawing) return;
+            const pos = getPos(e);
+            modalCtx.lineTo(pos.x, pos.y);
+            modalCtx.stroke();
+            if (e.cancelable) e.preventDefault();
+            e.stopPropagation();
+        }
+
+        function stopDrawing(e) {
+            if (isDrawing) {
+                isDrawing = false;
+                modalCtx.closePath();
+                if (e && e.cancelable) e.preventDefault();
+            }
+        }
+
+        modalCanvas.addEventListener('mousedown', startDrawing);
+        modalCanvas.addEventListener('mousemove', draw);
+        modalCanvas.addEventListener('mouseup', stopDrawing);
+        modalCanvas.addEventListener('mouseleave', stopDrawing);
+
+        modalCanvas.addEventListener('touchstart', startDrawing, { passive: false });
+        modalCanvas.addEventListener('touchmove', draw, { passive: false });
+        modalCanvas.addEventListener('touchend', stopDrawing, { passive: false });
+        modalCanvas.addEventListener('touchcancel', stopDrawing, { passive: false });
+
+        // Prevent background scroll when touching overlay
+        const overlay = document.getElementById('sigModalOverlay');
+        if (overlay) {
+            overlay.addEventListener('touchmove', (e) => {
+                if (e.cancelable) e.preventDefault();
+            }, { passive: false });
+        }
+    }
+
+    let savedSigScrollY = 0;
+
+    function openSignatureModal(targetInputId, titleText = 'เซ็นลายเซ็น', targetSlotId = null) {
+        savedSigScrollY = window.pageYOffset || document.documentElement.scrollTop || document.body.scrollTop || 0;
+        currentSigTargetInputId = targetInputId;
+        currentSigTargetSlotId = targetSlotId;
+
+        const titleElem = document.getElementById('sigModalTitle');
+        if (titleElem) titleElem.textContent = titleText;
+
+        clearModalSignature();
+
+        const overlay = document.getElementById('sigModalOverlay');
+        if (overlay) {
+            overlay.style.display = 'flex';
+            setTimeout(() => {
+                if (!modalCtx) initSignatureModalCanvas();
+            }, 50);
+        }
+    }
+
+    function closeSignatureModal() {
+        const overlay = document.getElementById('sigModalOverlay');
+        if (overlay) overlay.style.display = 'none';
+        currentSigTargetInputId = null;
+        currentSigTargetSlotId = null;
+
+        if (typeof savedSigScrollY === 'number') {
+            window.scrollTo({ top: savedSigScrollY, behavior: 'instant' });
+        }
+    }
+
+    function clearModalSignature() {
+        if (modalCanvas && modalCtx) {
+            modalCtx.clearRect(0, 0, modalCanvas.width, modalCanvas.height);
+            modalHasDrawn = false;
+        }
+    }
+
+    function saveModalSignature() {
+        if (!modalHasDrawn) {
+            if (typeof Swal !== 'undefined') {
+                Swal.fire({
+                    icon: 'warning',
+                    title: 'ยังไม่ได้เซ็นลายเซ็น',
+                    text: 'กรุณาเซ็นชื่อก่อนกดยืนยัน',
+                    confirmButtonText: 'ตกลง',
+                    confirmButtonColor: '#DC2626'
+                });
+            } else {
+                alert('กรุณาเซ็นชื่อก่อนกดยืนยัน');
+            }
+            return;
+        }
+
+        const base64 = modalCanvas.toDataURL('image/png');
+
+        if (currentSigTargetInputId) {
+            const input = document.getElementById(currentSigTargetInputId);
+            if (input) input.value = base64;
+        }
+
+        if (currentSigTargetSlotId) {
+            const slot = document.getElementById(currentSigTargetSlotId);
+            if (slot) {
+                const btnTrigger = slot.querySelector('.btn-trigger-sig-popup');
+                const previewContainer = slot.querySelector('.sig-signed-preview');
+                const img = slot.querySelector('.sig-thumb-img');
+
+                if (btnTrigger) btnTrigger.style.display = 'none';
+                if (previewContainer) previewContainer.style.display = 'flex';
+                if (img) img.src = base64;
+            }
+        }
+
+        closeSignatureModal();
+        if (window.lucide) lucide.createIcons();
+    }
+
+    function removeSlotSignature(inputId, slotId) {
+        const input = document.getElementById(inputId);
+        if (input) input.value = '';
+
+        const slot = document.getElementById(slotId);
+        if (slot) {
+            const btnTrigger = slot.querySelector('.btn-trigger-sig-popup');
+            const previewContainer = slot.querySelector('.sig-signed-preview');
+            const img = slot.querySelector('.sig-thumb-img');
+
+            if (btnTrigger) btnTrigger.style.display = 'inline-flex';
+            if (previewContainer) previewContainer.style.display = 'none';
+            if (img) img.src = '';
+        }
+        if (window.lucide) lucide.createIcons();
+    }
+
+    function escapeHtml(str) {
+        if (!str) return '';
+        return String(str)
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;")
+            .replace(/'/g, "&#039;");
+    }
+
+    function autoResizeTextarea(textarea) {
+        if (!textarea) return;
+        textarea.style.height = 'auto';
+        textarea.style.height = Math.max(32, textarea.scrollHeight) + 'px';
+    }
+
+    // Dynamic Daily Summary Row Management
+    function addDailySummaryRow(initial = '', detail = '') {
+        const tbody = document.getElementById('dailySummaryBody');
+        if (!tbody) return;
+
+        const row = document.createElement('tr');
+        row.className = 'mb-row';
+        row.innerHTML = `
+            <td style="width: 96px; min-width: 96px; max-width: 105px; vertical-align: top;">
+                <input type="text" name="ds_staff_initial[]" class="mb-staff-input" value="${escapeHtml(initial)}" maxlength="3" placeholder="ระบุชื่อย่อ :" oninput="this.value = this.value.toUpperCase().replace(/[^A-Z]/g, '').slice(0, 3); compileDailySummary();">
+            </td>
+            <td style="vertical-align: top;">
+                <textarea name="ds_detail[]" class="mb-detail-input" placeholder="รายละเอียดสรุปงาน :" rows="1" oninput="autoResizeTextarea(this); compileDailySummary();">${escapeHtml(detail)}</textarea>
+            </td>
+            <td style="width: 32px; min-width: 32px; max-width: 32px; text-align: center; vertical-align: top; padding-top: 6px;">
+                <button type="button" class="btn-remove-mb-row" onclick="removeDailySummaryRow(this)" title="ลบบรรทัด">
+                    <i data-lucide="trash-2" style="width: 14px; height: 14px;"></i>
+                </button>
+            </td>
+        `;
+        tbody.appendChild(row);
+
+        const textarea = row.querySelector('textarea');
+        if (textarea) {
+            autoResizeTextarea(textarea);
+        }
+
+        if (window.lucide) {
+            lucide.createIcons();
+        }
+    }
+
+    function removeDailySummaryRow(btn) {
+        const row = btn.closest('tr');
+        if (row) {
+            row.remove();
+            compileDailySummary();
+        }
+    }
+
+    function compileDailySummary() {
+        const initials = document.querySelectorAll('input[name="ds_staff_initial[]"]');
+        const details = document.querySelectorAll('textarea[name="ds_detail[]"], input[name="ds_detail[]"]');
+        const lines = [];
+
+        for (let i = 0; i < initials.length; i++) {
+            const initVal = initials[i].value.trim().toUpperCase();
+            const detailVal = details[i].value.trim();
+            if (initVal || detailVal) {
+                if (initVal && detailVal) {
+                    lines.push(`${initVal}: ${detailVal}`);
+                } else if (initVal) {
+                    lines.push(`${initVal}:`);
+                } else {
+                    lines.push(detailVal);
+                }
+            }
+        }
+
+        const hiddenInput = document.getElementById('dailySummaryHidden');
+        if (hiddenInput) {
+            hiddenInput.value = lines.join('\n');
+        }
+    }
+
+    const IS_ADMIN = {{ 'true' if current_user.role == 'ADMIN' else 'false' }};
+
+    function checkDailyReportExists() {
+        if (IS_ADMIN) return;
+        const branchSelect = document.getElementById('branchMainInput');
+        const dateInput = document.getElementById('reportDateInput');
+        const branch = branchSelect ? branchSelect.value.trim() : '';
+        const date = dateInput ? dateInput.value.trim() : '';
+
+        const banner = document.getElementById('dailyReportLockedBanner');
+        const submitBtn = document.getElementById('dailySubmitBtn');
+
+        if (!branch || !date) {
+            if (banner) banner.style.display = 'none';
+            if (submitBtn) {
+                submitBtn.disabled = false;
+                submitBtn.style.opacity = '1';
+                submitBtn.style.cursor = 'pointer';
+                submitBtn.innerHTML = '<i data-lucide="save"></i> บันทึกรายงานการปฏิบัติงาน';
+                if (window.lucide) lucide.createIcons();
+            }
+            return;
+        }
+
+        fetch(`/daily-report/check-exists?branch=${encodeURIComponent(branch)}&date=${encodeURIComponent(date)}`)
+            .then(res => res.json())
+            .then(data => {
+                if (data && data.exists) {
+                    if (banner) {
+                        banner.style.display = 'flex';
+                        const titleEl = document.getElementById('dailyLockedTitle');
+                        const linkEl = document.getElementById('dailyLockedLink');
+                        if (titleEl) {
+                            titleEl.textContent = `สาขา ${branch} ได้ทำการส่งรายงานการปฏิบัติงานประจำวันที่ ${date} เรียบร้อยแล้ว`;
+                        }
+                        if (linkEl && data.id) {
+                            linkEl.href = `/daily-report/${data.id}`;
+                            linkEl.style.display = 'inline-flex';
+                        }
+                    }
+                    if (submitBtn) {
+                        submitBtn.disabled = true;
+                        submitBtn.style.opacity = '0.6';
+                        submitBtn.style.cursor = 'not-allowed';
+                        submitBtn.innerHTML = '<i data-lucide="lock"></i> ส่งรายงานแล้ว';
+                        if (window.lucide) lucide.createIcons();
+                    }
+                } else {
+                    if (banner) banner.style.display = 'none';
+                    if (submitBtn) {
+                        submitBtn.disabled = false;
+                        submitBtn.style.opacity = '1';
+                        submitBtn.style.cursor = 'pointer';
+                        submitBtn.innerHTML = '<i data-lucide="save"></i> บันทึกรายงานการปฏิบัติงาน';
+                        if (window.lucide) lucide.createIcons();
+                    }
+                }
+            })
+            .catch(err => console.error('Error checking daily report exists:', err));
+    }
+
+    // ================= FORM SUBMISSION =================
+    const dailyReportForm = document.getElementById('dailyReportSheetForm') || document.getElementById('dailyReportForm');
+    if (dailyReportForm) {
+        dailyReportForm.addEventListener('submit', (e) => {
+            const submitBtn = document.getElementById('dailySubmitBtn');
+            if (!IS_ADMIN && submitBtn && submitBtn.disabled) {
+                e.preventDefault();
+                alert('รายงานประจำวันนี้ของสาขานี้ได้ถูกส่งเรียบร้อยแล้ว');
+                return false;
+            }
+            compileDailySummary();
+        });
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+        initSignatureModalCanvas();
+
+        const branchSelect = document.getElementById('branchMainInput');
+        const dateInput = document.getElementById('reportDateInput');
+        if (branchSelect) branchSelect.addEventListener('change', checkDailyReportExists);
+        if (dateInput) dateInput.addEventListener('change', checkDailyReportExists);
+        checkDailyReportExists();
+
+        const dsBody = document.getElementById('dailySummaryBody');
+        if (dsBody && dsBody.children.length === 0) {
+            addDailySummaryRow();
+        }
+
+        if (window.lucide) {
+            lucide.createIcons();
+        }
+    });
+</script>
+{% endblock %}

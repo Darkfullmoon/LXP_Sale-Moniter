@@ -1,0 +1,1916 @@
+{% extends "app_layout.html" %}
+
+{% block title %}ประวัติการตรวจ Morning Audit สำนักงานขาย (FM-MS-007) - LXP Monitor{% endblock %}
+
+{% block breadcrumb %}
+<span class="breadcrumb-item"><a href="{{ url_for('dashboard') }}">หน้าหลัก</a></span>
+<span class="breadcrumb-separator">/</span>
+<span class="breadcrumb-item active">ประวัติ Morning Audit (FM-MS-007)</span>
+{% endblock %}
+
+{% block content %}
+<div class="audit-history-container">
+    <!-- Header Card -->
+    <div class="content-header-card">
+        <h1 class="content-title">ประวัติการตรวจ Morning Audit สำนักงานขาย (FM-MS-007)</h1>
+    </div>
+
+    <!-- AI Summarize Themed Filter Bar -->
+    <div class="content-card ai-filter-card" style="padding: 16px 22px; margin-top: 18px; margin-bottom: 20px;">
+        <form method="GET" action="{{ url_for('morning_audit_history') }}" style="margin: 0;">
+            <div style="display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap;">
+                <!-- Left: Branch Select, Date Picker & Reset Button -->
+                <div style="display: flex; align-items: center; gap: 14px; flex-wrap: wrap;">
+                    <!-- Branch Select -->
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <label class="form-label" style="margin: 0; font-size: 0.88rem; font-weight: 600; color: #334155; display: inline-flex; align-items: center; gap: 6px; white-space: nowrap;">
+                            <i data-lucide="map-pin" class="form-icon" style="width: 16px; height: 16px; color: #DC2626;"></i>
+                            <span>เลือกสาขา</span>
+                        </label>
+                        <select name="branch" class="form-select" onchange="this.form.submit()" style="width: 100%; max-width: 200px; padding: 9px 36px 9px 14px; background-color: #FFFFFF; border: 1px solid #CBD5E1; border-radius: 10px; color: #0F172A; font-size: 0.92rem; font-weight: 500; outline: none; cursor: pointer;">
+                            <option value="ALL" {% if current_branch == 'ALL' %}selected{% endif %}>ทุกสาขา</option>
+                            {% for b in branches %}
+                            <option value="{{ b }}" {% if current_branch == b %}selected{% endif %}>{{ b }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <!-- Date Filter -->
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <label class="form-label" style="margin: 0; font-size: 0.88rem; font-weight: 600; color: #334155; display: inline-flex; align-items: center; gap: 6px; white-space: nowrap;">
+                            <i data-lucide="calendar" class="form-icon" style="width: 16px; height: 16px; color: #DC2626;"></i>
+                            <span>วันที่รายงาน</span>
+                        </label>
+                        <input type="date" name="date" value="{{ current_date }}" onchange="this.form.submit()"
+                               style="padding: 8px 12px; background-color: #FFFFFF; border: 1px solid #CBD5E1; border-radius: 10px; color: #0F172A; font-size: 0.92rem; font-weight: 500; outline: none; cursor: pointer;">
+                    </div>
+
+                    {% if current_branch != 'ALL' or current_date or search_query %}
+                    <a href="{{ url_for('morning_audit_history') }}" class="btn-sheet-secondary" style="display: inline-flex; align-items: center; gap: 6px; padding: 8px 14px; border-radius: 10px; background: #FFFFFF; border: 1px solid #CBD5E1; color: #475569; font-size: 0.86rem; font-weight: 600; text-decoration: none; transition: all 0.2s ease;">
+                        <i data-lucide="rotate-ccw" style="width: 14px; height: 14px;"></i>
+                        <span>ล้างตัวกรอง</span>
+                    </a>
+                    {% endif %}
+                </div>
+
+                <!-- Right (Above "รายงาน" Column): Search Box with AI-themed red button -->
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <div style="position: relative; display: flex; align-items: center; width: 100%; max-width: 280px;">
+                        <input type="text" name="q" value="{{ search_query }}" 
+                               class="form-input" placeholder="ค้นหาตามสาขา..."
+                               style="width: 100%; padding: 9px 42px 9px 14px; background-color: #FFFFFF; border: 1px solid #CBD5E1; border-radius: 10px; color: #0F172A; font-size: 0.92rem; font-weight: 500; outline: none; transition: all 0.2s ease;">
+                        <button type="submit" title="ค้นหา" style="position: absolute; right: 4px; top: 50%; transform: translateY(-50%); background: linear-gradient(135deg, #DC2626 0%, #B91C1C 100%); color: #FFFFFF; border: none; border-radius: 7px; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; cursor: pointer; box-shadow: 0 2px 6px rgba(220, 38, 38, 0.25); transition: all 0.2s ease;">
+                            <i data-lucide="search" style="width: 15px; height: 15px;"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </form>
+    </div>
+
+    <!-- Audits Table / List Card -->
+    <div class="table-card-modern">
+        {% if audits and audits|length > 0 %}
+        <div class="table-responsive {% if current_user.role != 'ADMIN' %}user-scrollable-table{% endif %}">
+            <table class="data-table-modern audit-history-table">
+                <thead>
+                    <tr>
+                        <th class="col-center" style="width: 36px;">ID</th>
+                        <th style="{% if current_user.role == 'ADMIN' %}width: 16%;{% else %}width: 25%;{% endif %} padding-left: 10px;">สาขา</th>
+                        <th style="{% if current_user.role == 'ADMIN' %}width: 10%;{% else %}width: 18%;{% endif %}">วันที่ตรวจ</th>
+                        <th class="col-center" style="{% if current_user.role == 'ADMIN' %}width: 12%;{% else %}width: 20%;{% endif %}">ผลการตรวจ</th>
+                        {% if current_user.role == 'ADMIN' %}
+                        <th class="col-center" style="width: 55px;">ความสมบูรณ์</th>
+                        {% endif %}
+                        <th class="col-center" style="{% if current_user.role == 'ADMIN' %}width: 10%;{% else %}width: 18%;{% endif %}">บันทึกเมื่อ</th>
+                        <th class="col-center" style="{% if current_user.role == 'ADMIN' %}width: 190px; min-width: 190px;{% else %}width: 120px;{% endif %}">รายงาน</th>
+                        {% if current_user.role == 'ADMIN' %}
+                        <th class="col-center" style="width: 105px;">AI วิเคราะห์</th>
+                        {% endif %}
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in audits %}
+                    <tr class="morning-audit-row">
+                        <td class="col-center col-id">
+                            <span class="id-tag">{{ item.id }}</span>
+                        </td>
+                        <td class="col-branch">
+                            <div class="branch-name-title">
+                                <i data-lucide="map-pin" class="table-mini-icon"></i>
+                                <span>{{ item.branch | format_branch }}</span>
+                            </div>
+                            <span class="mobile-id-badge">#{{ item.id }}</span>
+                        </td>
+                        <td class="col-date">
+                            <span class="mobile-label">วันที่ตรวจ:</span>
+                            <div class="date-badge-wrap">
+                                <div class="date-badge">
+                                    <i data-lucide="calendar" class="table-mini-icon"></i>
+                                    <span>{{ item.audit_date | format_date }}</span>
+                                </div>
+                                {% if item.photo_count and item.photo_count > 0 %}
+                                <div class="photo-count-pill">
+                                    <i data-lucide="camera" style="width: 12px; height: 12px;"></i>
+                                    <span>{{ item.photo_count }} รูป</span>
+                                </div>
+                                {% endif %}
+                            </div>
+                        </td>
+                        <td class="col-center col-status">
+                            <span class="mobile-label">ผลการตรวจ:</span>
+                            <div class="status-counts-cell">
+                                <span class="badge-count-pass" title="ผ่าน">
+                                    <i data-lucide="check"></i> ผ่าน {{ item.passed_items }}
+                                </span>
+                                {% if item.failed_items > 0 %}
+                                <span class="badge-count-fail" title="ไม่ผ่าน">
+                                    <i data-lucide="alert-triangle"></i> ไม่ผ่าน {{ item.failed_items }}
+                                </span>
+                                {% else %}
+                                <span class="badge-count-allpass">ครบ 100%</span>
+                                {% endif %}
+                            </div>
+                        </td>
+                        {% if current_user.role == 'ADMIN' %}
+                        <td class="col-center col-pct">
+                            <span class="mobile-label">ความสมบูรณ์:</span>
+                            {% set pct = ((item.passed_items / item.total_items) * 100)|round|int if item.total_items > 0 else 100 %}
+                            <span class="badge-integrity-pct {% if pct == 100 %}pct-100{% elif pct >= 80 %}pct-high{% else %}pct-low{% endif %}">
+                                {{ pct }}%
+                            </span>
+                        </td>
+                        {% endif %}
+                        <td class="col-center col-created" style="padding: 6px 3px;">
+                            <span class="mobile-label">บันทึกเมื่อ:</span>
+                            {% if item.created_at %}
+                            <div style="display: flex; flex-direction: column; align-items: center; line-height: 1.2; font-size: 0.74rem;">
+                                <span style="font-weight: 600; color: #334155;">{{ item.created_at.strftime('%d/%m/%Y') if item.created_at.strftime is defined else item.created_at[:10] }}</span>
+                                <span style="color: #64748B; font-size: 0.68rem;">{{ item.created_at.strftime('%H:%M') if item.created_at.strftime is defined else item.created_at[11:16] }} น.</span>
+                            </div>
+                            {% else %}
+                            <span class="text-dim-small">-</span>
+                            {% endif %}
+                        </td>
+                        <td class="col-center col-report-cell" style="padding: 7px 4px; min-width: 190px;">
+                            <span class="mobile-label">รายงาน:</span>
+                            <div style="display: flex; flex-direction: column; align-items: center; gap: 6px; width: 100%;">
+                                <a href="{{ url_for('morning_audit_detail', audit_id=item.id) }}" class="btn-action-view" title="ดูรายงานฉบับเต็ม" style="padding: 5px 10px; font-size: 0.74rem; gap: 4px; white-space: nowrap; width: 100%; max-width: 184px; justify-content: center; box-sizing: border-box;">
+                                    <i data-lucide="file-text" style="width: 12px; height: 12px;"></i>
+                                    <span>ดูรายงาน</span>
+                                </a>
+
+                                {% if current_user.role == 'ADMIN' %}
+                                {% set is_v = item.is_verified %}
+                                {% set hc = item.headcount_checked %}
+                                {% set dc = item.dress_code_checked %}
+                                {% set failed_count = (0 if hc else 1) + (0 if dc else 1) %}
+                                <div class="table-verify-box {% if is_v %}{% if failed_count == 0 %}is-verified-pass{% elif failed_count == 1 %}is-verified-warn{% else %}is-verified-fail{% endif %}{% endif %}" id="verifyBox-morning-{{ item.id }}">
+                                    <div class="verify-checkboxes">
+                                        <label class="verify-checkbox-label" title="ตรวจสอบจำนวนพนักงานตรงตามเกณฑ์">
+                                            <input type="checkbox" class="verify-input" id="hc-morning-{{ item.id }}" {% if hc %}checked{% endif %}>
+                                            <span>จำนวนพนักงาน</span>
+                                        </label>
+                                        <label class="verify-checkbox-label" title="ตรวจสอบพนักงานแต่งกายเรียบร้อยตามมาตรฐาน">
+                                            <input type="checkbox" class="verify-input" id="dc-morning-{{ item.id }}" {% if dc %}checked{% endif %}>
+                                            <span>พนักงานแต่งตัวเรียบร้อย</span>
+                                        </label>
+                                    </div>
+                                    <div class="verify-btn-wrap" id="verifyAction-morning-{{ item.id }}">
+                                        {% if is_v %}
+                                        <div class="verified-status-pill">
+                                            {% if failed_count == 0 %}
+                                            <button type="button" class="btn-verify-badge-action pass" onclick="handleTableVerification('morning', {{ item.id }}, true)" title="ตรวจแล้ว (ผ่านทั้งหมด) - คลิกเพื่อบันทึกซ้ำ">
+                                                <i data-lucide="shield-check" style="width: 12px; height: 12px;"></i>
+                                                <span>ตรวจแล้ว</span>
+                                            </button>
+                                            {% elif failed_count == 1 %}
+                                            <button type="button" class="btn-verify-badge-action warn" onclick="handleTableVerification('morning', {{ item.id }}, true)" title="ไม่ผ่าน 1 อัน - คลิกเพื่อบันทึกซ้ำ">
+                                                <i data-lucide="alert-triangle" style="width: 12px; height: 12px;"></i>
+                                                <span>ไม่ผ่าน 1 อัน</span>
+                                            </button>
+                                            {% else %}
+                                            <button type="button" class="btn-verify-badge-action fail" onclick="handleTableVerification('morning', {{ item.id }}, true)" title="ไม่ผ่าน 2 อัน - คลิกเพื่อบันทึกซ้ำ">
+                                                <i data-lucide="shield-alert" style="width: 12px; height: 12px;"></i>
+                                                <span>ไม่ผ่าน 2 อัน</span>
+                                            </button>
+                                            {% endif %}
+                                            <button type="button" class="btn-verify-undo" onclick="handleTableVerification('morning', {{ item.id }}, false)" title="ยกเลิกการตรวจ">
+                                                <i data-lucide="rotate-ccw" style="width: 11px; height: 11px;"></i>
+                                            </button>
+                                        </div>
+                                        {% else %}
+                                        <button type="button" class="btn-verify-submit" onclick="handleTableVerification('morning', {{ item.id }}, true)" title="คลิกเพื่อบันทึกสถานะตรวจ">
+                                            <i data-lucide="check" style="width: 12px; height: 12px;"></i>
+                                            <span>ตรวจแล้ว</span>
+                                        </button>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                                {% else %}
+                                {% if item.is_verified %}
+                                {% set failed_count = (0 if item.headcount_checked else 1) + (0 if item.dress_code_checked else 1) %}
+                                {% if failed_count == 0 %}
+                                <span class="badge-verified-yes" title="ตรวจแล้วโดย {{ item.verified_by }} เมื่อ {{ item.verified_at }}">
+                                    <i data-lucide="shield-check" style="width: 12px; height: 12px;"></i> ตรวจแล้ว
+                                </span>
+                                {% elif failed_count == 1 %}
+                                <span class="badge-verified-warn" title="ไม่ผ่าน 1 อัน โดย {{ item.verified_by }} เมื่อ {{ item.verified_at }}">
+                                    <i data-lucide="alert-triangle" style="width: 12px; height: 12px;"></i> ไม่ผ่าน 1 อัน
+                                </span>
+                                {% else %}
+                                <span class="badge-verified-no" title="ไม่ผ่าน 2 อัน โดย {{ item.verified_by }} เมื่อ {{ item.verified_at }}">
+                                    <i data-lucide="shield-alert" style="width: 12px; height: 12px;"></i> ไม่ผ่าน 2 อัน
+                                </span>
+                                {% endif %}
+                                {% else %}
+                                <span class="badge-verified-pending" title="ยังไม่ได้รับการตรวจ">
+                                    <i data-lucide="clock" style="width: 12px; height: 12px;"></i> รอตรวจ
+                                </span>
+                                {% endif %}
+                                {% endif %}
+                            </div>
+                        </td>
+                        {% if current_user.role == 'ADMIN' %}
+                        <td class="col-center col-ai-btn">
+                            <div style="display: flex; flex-direction: column; gap: 6px; align-items: stretch; width: 100%;">
+                                {% set pct = ((item.passed_items / item.total_items) * 100)|round|int if item.total_items > 0 else 100 %}
+                                {% if pct < 100 %}
+                                <a href="{{ url_for('morning_audit_ai_analysis', audit_id=item.id) }}" class="btn-action-ai-view" title="ดูผลวิเคราะห์ AI สรุปรายงาน">
+                                    <i data-lucide="sparkles"></i>
+                                    <span>ดูผลวิเคราะห์ AI</span>
+                                    {% if item.ai_analysis %}
+                                    <span class="ai-cached-indicator" title="บันทึกผลวิเคราะห์แล้ว (เปิดได้ทันที)"></span>
+                                    {% endif %}
+                                </a>
+                                {% endif %}
+
+                                <!-- Button 2: AI Staff Photo & Headcount Analysis (under AI analysis button) -->
+                                <button type="button" class="btn-action-ai-staff" id="btnStaffAi_{{ item.id }}" onclick="openStaffAiModal({{ item.id }}, '{{ item.branch | escape }}')" title="AI วิเคราะห์รูปภาพพนักงานและการแต่งกาย">
+                                    <i data-lucide="scan-face" id="staffAiIcon_{{ item.id }}"></i>
+                                    <span>วิเคราะห์รูปพนักงาน</span>
+                                    {% if item.ai_staff_analysis %}
+                                    <span class="ai-cached-indicator" style="background: #10B981;" title="วิเคราะห์แล้ว"></span>
+                                    {% endif %}
+                                </button>
+                            </div>
+                        </td>
+                        {% endif %}
+                    </tr>
+                    {% if item.photos and item.photos|length > 0 %}
+                    <tr class="morning-audit-photos-row">
+                        <td colspan="{% if current_user.role == 'ADMIN' %}8{% else %}6{% endif %}" class="col-history-photos">
+                            <div class="history-photos-strip">
+                                {% for photo_url in item.photos %}
+                                <div class="history-photo-thumb-box" onclick="openHistoryLightbox('{{ item.id }}', {{ loop.index0 }})" title="กดเพื่อดูรูปภาพขนาดใหญ่ (รูปที่ {{ loop.index }})">
+                                    <img src="{{ photo_url }}" alt="รูปถ่ายแนบ #{{ loop.index }}" class="history-photo-thumb" loading="lazy">
+                                    <span class="history-photo-badge">#{{ loop.index }}</span>
+                                    <div class="history-photo-overlay">
+                                        <i data-lucide="zoom-in"></i>
+                                    </div>
+                                </div>
+                                {% endfor %}
+                            </div>
+                        </td>
+                    </tr>
+                    {% endif %}
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <!-- Empty State -->
+        <div class="empty-state-modern">
+            <div class="empty-icon-wrap">
+                <i data-lucide="clipboard-list"></i>
+            </div>
+            <h3 class="empty-title">ยังไม่มีประวัติการตรวจ Morning Audit</h3>
+            <p class="empty-desc">เริ่มทำแบบตรวจความพร้อมสำนักงานขายเพื่อบันทึกประวัติรายงาน FM-MS-007</p>
+            {% if current_user.role != 'ADMIN' %}
+            <a href="{{ url_for('morning_audit') }}" class="btn-primary-modern" style="margin-top: 15px;">
+                <i data-lucide="plus-circle"></i>
+                <span>เริ่มทำแบบตรวจตอนนี้</span>
+            </a>
+            {% endif %}
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<style>
+    /* Balanced & Spacious Morning Audit History Table - Full Width Desktop */
+    .audit-history-container {
+        max-width: 100%;
+        margin: 0 auto;
+        padding-bottom: 40px;
+        width: 100%;
+        box-sizing: border-box;
+    }
+
+    .table-card-modern {
+        background: #ffffff;
+        border-radius: 14px;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+        border: 1px solid #e2e8f0;
+        margin-top: 16px;
+        width: 100%;
+        max-width: 100%;
+        box-sizing: border-box;
+        overflow: hidden !important;
+    }
+
+    .table-card-modern .table-responsive,
+    .table-responsive,
+    .user-scrollable-table {
+        width: 100% !important;
+        display: block !important;
+        box-sizing: border-box !important;
+        overflow-x: hidden !important;
+        overflow-y: hidden !important;
+    }
+
+    .audit-history-table {
+        width: 100% !important;
+        min-width: 0 !important;
+        table-layout: auto !important;
+        border-collapse: separate;
+        border-spacing: 0;
+        font-size: 0.82rem;
+    }
+
+    .audit-history-table th {
+        background: #f8fafc;
+        color: #334155;
+        font-weight: 600;
+        padding: 8px 6px;
+        font-size: 0.80rem;
+        border-bottom: 2px solid #e2e8f0;
+        white-space: nowrap;
+        letter-spacing: 0.1px;
+        text-align: left;
+    }
+
+    .audit-history-table th.col-center,
+    .audit-history-table td.col-center {
+        text-align: center !important;
+    }
+
+    .audit-history-table td {
+        padding: 8px 6px;
+        border-bottom: 1px solid #f1f5f9;
+        vertical-align: middle;
+        color: #1e293b;
+        line-height: 1.25;
+        text-align: left;
+    }
+
+    /* ================= CONTENT HEADER CARD ================= */
+    .content-header-card {
+        display: block;
+        margin-bottom: 4px;
+    }
+
+    /* ================= EMPTY STATE STYLES ================= */
+    .empty-state-modern {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        text-align: center;
+        padding: 56px 24px;
+        box-sizing: border-box;
+        width: 100%;
+        max-width: 100%;
+        margin: 0 auto;
+    }
+
+    .empty-icon-wrap {
+        width: 64px;
+        height: 64px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, #F8FAFC 0%, #F1F5F9 100%);
+        border: 1.5px solid #E2E8F0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin-bottom: 16px;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+    }
+
+    .empty-icon-wrap i {
+        width: 30px;
+        height: 30px;
+        color: #94A3B8;
+    }
+
+    .empty-title {
+        font-size: 1.15rem;
+        font-weight: 700;
+        color: #1E293B;
+        margin: 0 0 10px 0;
+        line-height: 1.5;
+        padding: 0 20px;
+        box-sizing: border-box;
+        word-break: break-word;
+        overflow-wrap: break-word;
+        max-width: 650px;
+    }
+
+    .empty-desc {
+        font-size: 0.92rem;
+        color: #64748B;
+        margin: 0;
+        line-height: 1.6;
+        padding: 0 20px;
+        box-sizing: border-box;
+        max-width: 540px;
+        word-break: break-word;
+        overflow-wrap: break-word;
+    }
+
+    .btn-primary-modern {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 10px 20px;
+        border-radius: 10px;
+        background: linear-gradient(135deg, #2563EB 0%, #1D4ED8 100%);
+        color: #FFFFFF;
+        font-weight: 600;
+        font-size: 0.9rem;
+        text-decoration: none;
+        transition: all 0.2s ease;
+        box-shadow: 0 4px 12px rgba(37, 99, 235, 0.25);
+    }
+
+    .btn-primary-modern:hover {
+        background: linear-gradient(135deg, #1D4ED8 0%, #1E40AF 100%);
+        transform: translateY(-2px);
+        box-shadow: 0 6px 16px rgba(37, 99, 235, 0.35);
+        color: #FFFFFF;
+    }
+
+    /* ================= ADMIN VERIFICATION TABLE COMPONENT ================= */
+    .table-verify-box {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        align-items: stretch;
+        padding: 9px 11px;
+        background: #FFFFFF;
+        border: 1.5px solid #E2E8F0;
+        border-radius: 11px;
+        font-size: 0.74rem;
+        width: 100%;
+        max-width: 184px;
+        margin: 0 auto;
+        box-sizing: border-box;
+        transition: all 0.2s ease-in-out;
+        box-shadow: 0 2px 6px rgba(15, 23, 42, 0.05), 0 1px 2px rgba(15, 23, 42, 0.03);
+        overflow: hidden;
+    }
+
+    .table-verify-box:hover {
+        border-color: #CBD5E1;
+        box-shadow: 0 4px 12px rgba(15, 23, 42, 0.08);
+    }
+
+    .table-verify-box.is-verified-pass {
+        background: linear-gradient(145deg, #FFFFFF 0%, #F0FDF4 100%);
+        border-color: #86EFAC;
+        box-shadow: 0 2px 8px rgba(34, 197, 94, 0.12);
+    }
+
+    .table-verify-box.is-verified-pass:hover {
+        border-color: #4ADE80;
+        box-shadow: 0 4px 12px rgba(34, 197, 94, 0.18);
+    }
+
+    .table-verify-box.is-verified-warn {
+        background: linear-gradient(145deg, #FFFFFF 0%, #FFFBEB 100%);
+        border-color: #FCD34D;
+        box-shadow: 0 2px 8px rgba(245, 158, 11, 0.12);
+    }
+
+    .table-verify-box.is-verified-warn:hover {
+        border-color: #F59E0B;
+        box-shadow: 0 4px 12px rgba(245, 158, 11, 0.18);
+    }
+
+    .table-verify-box.is-verified-fail {
+        background: linear-gradient(145deg, #FFFFFF 0%, #FEF2F2 100%);
+        border-color: #FCA5A5;
+        box-shadow: 0 2px 8px rgba(239, 68, 68, 0.12);
+    }
+
+    .table-verify-box.is-verified-fail:hover {
+        border-color: #EF4444;
+        box-shadow: 0 4px 12px rgba(239, 68, 68, 0.18);
+    }
+
+    .verify-checkboxes {
+        display: flex;
+        flex-direction: column;
+        gap: 5px;
+        width: 100%;
+        box-sizing: border-box;
+    }
+
+    .verify-checkbox-label {
+        display: flex;
+        align-items: center;
+        gap: 7px;
+        cursor: pointer;
+        font-size: 0.73rem;
+        color: #1E293B;
+        font-weight: 550;
+        user-select: none;
+        line-height: 1.25;
+        padding: 3px 5px;
+        border-radius: 6px;
+        transition: background 0.15s ease;
+        box-sizing: border-box;
+        width: 100%;
+    }
+
+    .verify-checkbox-label:hover {
+        background: rgba(241, 245, 249, 0.85);
+    }
+
+    .verify-checkbox-label input[type="checkbox"] {
+        width: 14px;
+        height: 14px;
+        cursor: pointer;
+        accent-color: #2563EB;
+        margin: 0;
+        flex-shrink: 0;
+        border-radius: 3px;
+    }
+
+    .verify-checkbox-label span {
+        white-space: normal;
+        word-break: normal;
+        overflow-wrap: break-word;
+        letter-spacing: -0.1px;
+        line-height: 1.25;
+        flex: 1;
+        text-align: left;
+    }
+
+    .verify-btn-wrap {
+        width: 100%;
+        margin-top: 2px;
+    }
+
+    .btn-verify-submit {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 5px;
+        width: 100%;
+        padding: 5px 8px;
+        border-radius: 6px;
+        background: linear-gradient(135deg, #2563EB 0%, #1D4ED8 100%);
+        color: #FFFFFF;
+        font-size: 0.74rem;
+        font-weight: 600;
+        border: none;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        box-shadow: 0 2px 6px rgba(37, 99, 235, 0.25);
+    }
+
+    .btn-verify-submit:hover {
+        background: linear-gradient(135deg, #1D4ED8 0%, #1E40AF 100%);
+        transform: translateY(-1px);
+        box-shadow: 0 4px 10px rgba(37, 99, 235, 0.35);
+    }
+
+    .verified-status-pill {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 5px;
+        width: 100%;
+    }
+
+    .btn-verify-badge-action {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 4px;
+        flex: 1;
+        padding: 4px 6px;
+        border-radius: 6px;
+        font-size: 0.72rem;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.15s ease;
+        white-space: nowrap;
+        border: 1px solid transparent;
+    }
+
+    .btn-verify-badge-action.pass {
+        background: #DCFCE7;
+        color: #15803D;
+        border-color: #86EFAC;
+    }
+
+    .btn-verify-badge-action.pass:hover {
+        background: #BBF7D0;
+        border-color: #4ADE80;
+        transform: translateY(-1px);
+    }
+
+    .btn-verify-badge-action.warn {
+        background: #FEF3C7;
+        color: #B45309;
+        border-color: #FCD34D;
+    }
+
+    .btn-verify-badge-action.warn:hover {
+        background: #FDE68A;
+        border-color: #F59E0B;
+        transform: translateY(-1px);
+    }
+
+    .btn-verify-badge-action.fail {
+        background: #FEE2E2;
+        color: #B91C1C;
+        border-color: #FCA5A5;
+    }
+
+    .btn-verify-badge-action.fail:hover {
+        background: #FECACA;
+        border-color: #EF4444;
+        transform: translateY(-1px);
+    }
+
+    .badge-verified-yes {
+        display: inline-flex;
+        align-items: center;
+        gap: 3px;
+        padding: 2px 6px;
+        border-radius: 4px;
+        font-size: 0.71rem;
+        font-weight: 700;
+        background: #DCFCE7;
+        color: #15803D;
+        border: 1px solid #86EFAC;
+        white-space: nowrap;
+    }
+
+    .badge-verified-warn {
+        display: inline-flex;
+        align-items: center;
+        gap: 3px;
+        padding: 2px 6px;
+        border-radius: 4px;
+        font-size: 0.71rem;
+        font-weight: 700;
+        background: #FEF3C7;
+        color: #B45309;
+        border: 1px solid #FCD34D;
+        white-space: nowrap;
+    }
+
+    .badge-verified-no {
+        display: inline-flex;
+        align-items: center;
+        gap: 3px;
+        padding: 2px 6px;
+        border-radius: 4px;
+        font-size: 0.71rem;
+        font-weight: 700;
+        background: #FEE2E2;
+        color: #B91C1C;
+        border: 1px solid #FCA5A5;
+        white-space: nowrap;
+    }
+
+    .badge-verified-pending {
+        display: inline-flex;
+        align-items: center;
+        gap: 3px;
+        padding: 2px 6px;
+        border-radius: 4px;
+        font-size: 0.71rem;
+        font-weight: 600;
+        background: #F1F5F9;
+        color: #64748B;
+        border: 1px solid #CBD5E1;
+        white-space: nowrap;
+    }
+
+    .btn-verify-undo {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 24px;
+        height: 24px;
+        padding: 0;
+        border-radius: 6px;
+        background: #FFFFFF;
+        color: #64748B;
+        border: 1px solid #CBD5E1;
+        cursor: pointer;
+        font-size: 0.68rem;
+        transition: all 0.15s ease;
+        flex-shrink: 0;
+        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+    }
+
+    .btn-verify-undo:hover {
+        background: #FEE2E2;
+        color: #B91C1C;
+        border-color: #FCA5A5;
+        transform: translateY(-1px);
+    }
+
+    .mobile-label,
+    .mobile-id-badge {
+        display: none;
+    }
+
+    .date-badge-wrap {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        flex-wrap: wrap;
+    }
+
+    .photo-count-pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        font-size: 0.76rem;
+        font-weight: 600;
+        color: #2563EB;
+        background: #EFF6FF;
+        border: 1px solid #BFDBFE;
+        padding: 2px 7px;
+        border-radius: 6px;
+    }
+
+    @media (min-width: 769px) and (max-width: 992px) {
+        .table-card-modern {
+            overflow: hidden !important;
+        }
+        .table-card-modern .table-responsive,
+        .table-responsive {
+            overflow-x: auto !important;
+            overflow-y: hidden !important;
+            -webkit-overflow-scrolling: touch !important;
+        }
+        .audit-history-table {
+            min-width: 720px !important;
+        }
+    }
+
+    /* CARD VIEW TRANSFORMATION (Screens <= 768px) */
+    @media (max-width: 768px) {
+        .audit-history-container {
+            padding: 0 0 30px 0;
+            width: 100% !important;
+            max-width: 100% !important;
+        }
+
+        .content-title {
+            font-size: 1.25rem !important;
+        }
+
+        .ai-filter-card {
+            padding: 14px !important;
+            margin-top: 12px !important;
+            margin-bottom: 14px !important;
+            border-radius: 12px !important;
+        }
+
+        .ai-filter-card form > div {
+            flex-direction: column !important;
+            align-items: stretch !important;
+            gap: 12px !important;
+        }
+
+        .ai-filter-card form > div > div {
+            width: 100% !important;
+            flex-direction: column !important;
+            align-items: stretch !important;
+            gap: 10px !important;
+        }
+
+        .ai-filter-card .form-label {
+            margin-bottom: 2px !important;
+        }
+
+        .ai-filter-card .form-select,
+        .ai-filter-card input[type="date"],
+        .ai-filter-card .form-input,
+        .ai-filter-card div[style*="max-width: 280px"],
+        .ai-filter-card div[style*="max-width: 200px"] {
+            max-width: 100% !important;
+            width: 100% !important;
+            box-sizing: border-box !important;
+        }
+
+        .table-card-modern {
+            background: transparent !important;
+            border: none !important;
+            box-shadow: none !important;
+            margin-top: 10px !important;
+            overflow: visible !important;
+            padding: 0 !important;
+        }
+
+        .table-card-modern .table-responsive,
+        .table-responsive {
+            overflow: visible !important;
+        }
+
+        .audit-history-table {
+            display: block !important;
+            width: 100% !important;
+            min-width: 0 !important;
+            table-layout: auto !important;
+        }
+
+        .audit-history-table thead {
+            display: none !important;
+        }
+
+        .audit-history-table tbody {
+            display: flex !important;
+            flex-direction: column !important;
+            gap: 12px !important;
+            width: 100% !important;
+        }
+
+        .audit-history-table tbody tr.morning-audit-row {
+            display: flex !important;
+            flex-direction: column !important;
+            background: #FFFFFF !important;
+            border: 1px solid #E2E8F0 !important;
+            border-radius: 14px !important;
+            padding: 14px 16px !important;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.04) !important;
+            gap: 8px !important;
+            box-sizing: border-box !important;
+            width: 100% !important;
+        }
+
+        .audit-history-table tbody tr.morning-audit-row:hover {
+            background: #FFFFFF !important;
+            box-shadow: 0 4px 14px rgba(0, 0, 0, 0.08) !important;
+        }
+
+        .audit-history-table tbody td {
+            display: flex !important;
+            justify-content: space-between !important;
+            align-items: center !important;
+            padding: 2px 0 !important;
+            border: none !important;
+            width: 100% !important;
+            box-sizing: border-box !important;
+            text-align: left !important;
+        }
+
+        .audit-history-table tbody td.col-id {
+            display: none !important;
+        }
+
+        .mobile-id-badge {
+            display: inline-block;
+            font-size: 0.8rem;
+            font-weight: 700;
+            color: #64748B;
+            background: #F1F5F9;
+            padding: 2px 8px;
+            border-radius: 6px;
+        }
+
+        .mobile-label {
+            display: inline-block;
+            font-size: 0.80rem;
+            font-weight: 600;
+            color: #64748B;
+        }
+
+        .desktop-only-dash {
+            display: none !important;
+        }
+
+        .audit-history-table tbody td.col-branch {
+            display: flex !important;
+            align-items: center !important;
+            justify-content: space-between !important;
+            padding-bottom: 7px !important;
+            border-bottom: 1px dashed #E2E8F0 !important;
+        }
+
+        .audit-history-table tbody td.col-branch .branch-name-title {
+            font-size: 0.94rem !important;
+            font-weight: 700 !important;
+            color: #0F172A !important;
+        }
+
+        .audit-history-table tbody td.col-date,
+        .audit-history-table tbody td.col-status,
+        .audit-history-table tbody td.col-pct,
+        .audit-history-table tbody td.col-created {
+            display: flex !important;
+            align-items: center !important;
+            justify-content: space-between !important;
+            font-size: 0.82rem !important;
+        }
+
+        .audit-history-table tbody td.col-report-btn,
+        .audit-history-table tbody td.col-ai-btn {
+            display: block !important;
+            padding-top: 6px !important;
+            width: 100% !important;
+        }
+
+        .audit-history-table tbody td.col-report-btn {
+            border-top: 1px solid #F1F5F9 !important;
+            margin-top: 4px !important;
+            padding-top: 7px !important;
+        }
+
+        .audit-history-table tbody td.col-report-btn .btn-action-view {
+            width: 100% !important;
+            box-sizing: border-box !important;
+            justify-content: center !important;
+            padding: 8px 14px !important;
+            font-size: 0.88rem !important;
+            background: #2563EB !important;
+            color: #FFFFFF !important;
+            border-color: #2563EB !important;
+            border-radius: 8px !important;
+            box-shadow: 0 2px 8px rgba(37, 99, 235, 0.25) !important;
+        }
+
+        .audit-history-table tbody td.col-report-btn .btn-action-view i {
+            color: #FFFFFF !important;
+        }
+
+        .audit-history-table tbody td.col-ai-btn .btn-action-ai-view {
+            width: 100% !important;
+            box-sizing: border-box !important;
+            justify-content: center !important;
+            padding: 8px 14px !important;
+            font-size: 0.88rem !important;
+            border-radius: 8px !important;
+        }
+
+        .empty-state-modern {
+            padding: 36px 16px !important;
+        }
+
+        .empty-title {
+            font-size: 1.02rem !important;
+            padding: 0 10px !important;
+        }
+
+        .empty-desc {
+            font-size: 0.84rem !important;
+            padding: 0 10px !important;
+        }
+    }
+
+    .audit-history-table tbody tr {
+        transition: background 0.15s ease;
+    }
+
+    .audit-history-table tbody tr:hover {
+        background: #f8fafc;
+    }
+
+    /* ID Tag */
+    .id-tag {
+        font-weight: 600;
+        color: #64748b;
+        font-size: 0.85rem;
+        background: #f1f5f9;
+        padding: 4px 10px;
+        border-radius: 6px;
+        display: inline-block;
+    }
+
+    /* Branch title */
+    .branch-name-title {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        font-weight: 600;
+        color: #0f172a;
+        font-size: 0.95rem;
+    }
+
+    .branch-name-title .table-mini-icon {
+        color: #3b82f6;
+        width: 16px;
+        height: 16px;
+        flex-shrink: 0;
+    }
+
+    /* Date badge */
+    .date-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        color: #475569;
+        font-size: 0.9rem;
+    }
+
+    .date-badge .table-mini-icon {
+        color: #64748b;
+        width: 15px;
+        height: 15px;
+    }
+
+    /* User Chip */
+    .user-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        color: #334155;
+        font-weight: 500;
+        font-size: 0.9rem;
+    }
+
+    .user-chip-avatar {
+        width: 28px;
+        height: 28px;
+        border-radius: 50%;
+        background: #e0e7ff;
+        color: #4338ca;
+        font-weight: 700;
+        font-size: 0.8rem;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    /* Status counts */
+    .status-counts-cell {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        flex-wrap: nowrap;
+    }
+
+    .badge-count-pass {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        padding: 4px 9px;
+        border-radius: 20px;
+        background: #ecfdf5;
+        color: #059669;
+        font-weight: 600;
+        font-size: 0.8rem;
+        border: 1px solid #a7f3d0;
+    }
+
+    .badge-count-pass i {
+        width: 13px;
+        height: 13px;
+    }
+
+    .badge-count-fail {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        padding: 4px 9px;
+        border-radius: 20px;
+        background: #fef2f2;
+        color: #dc2626;
+        font-weight: 600;
+        font-size: 0.8rem;
+        border: 1px solid #fecaca;
+    }
+
+    .badge-count-fail i {
+        width: 13px;
+        height: 13px;
+    }
+
+    .badge-count-allpass {
+        padding: 4px 9px;
+        border-radius: 20px;
+        background: #f0fdf4;
+        color: #16a34a;
+        font-weight: 600;
+        font-size: 0.8rem;
+        border: 1px solid #bbf7d0;
+    }
+
+    /* Integrity Percentage Badge (ความสมบูรณ์) */
+    .badge-integrity-pct {
+        display: inline-block;
+        padding: 4px 10px;
+        border-radius: 20px;
+        font-weight: 700;
+        font-size: 0.86rem;
+        letter-spacing: 0.2px;
+        min-width: 55px;
+        text-align: center;
+    }
+
+    .badge-integrity-pct.pct-100 {
+        background: #dcfce7;
+        color: #15803d;
+        border: 1px solid #86efac;
+    }
+
+    .badge-integrity-pct.pct-high {
+        background: #eff6ff;
+        color: #1d4ed8;
+        border: 1px solid #bfdbfe;
+    }
+
+    .badge-integrity-pct.pct-low {
+        background: #fff1f2;
+        color: #be123c;
+        border: 1px solid #fecdd3;
+    }
+
+    .text-dim-small {
+        color: #64748b;
+        font-size: 0.82rem;
+        white-space: nowrap;
+    }
+
+    /* Action View Button (ดูรายงาน) */
+    .btn-action-view {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 5px;
+        padding: 6px 12px;
+        border-radius: 8px;
+        background: #f1f5f9;
+        color: #1e293b;
+        font-weight: 600;
+        font-size: 0.84rem;
+        text-decoration: none;
+        transition: all 0.2s ease;
+        border: 1px solid #cbd5e1;
+        white-space: nowrap;
+    }
+
+    .btn-action-view i {
+        width: 14px;
+        height: 14px;
+        color: #3b82f6;
+    }
+
+    .btn-action-view:hover {
+        background: #2563eb;
+        color: #ffffff;
+        border-color: #2563eb;
+        transform: translateY(-1px);
+        box-shadow: 0 4px 10px rgba(37, 99, 235, 0.2);
+    }
+
+    .btn-action-view:hover i {
+        color: #ffffff;
+    }
+
+    /* AI Action View Button */
+    .btn-action-ai-view {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 5px;
+        padding: 6px 11px;
+        border-radius: 8px;
+        background: linear-gradient(135deg, rgba(139, 92, 246, 0.08) 0%, rgba(99, 102, 241, 0.08) 100%);
+        color: #6D28D9;
+        font-weight: 600;
+        font-size: 0.84rem;
+        text-decoration: none;
+        transition: all 0.2s ease;
+        border: 1px solid #DDD6FE;
+        white-space: nowrap;
+        position: relative;
+    }
+
+    .btn-action-ai-view i {
+        width: 15px;
+        height: 15px;
+        color: #8B5CF6;
+    }
+
+    .btn-action-ai-view:hover {
+        background: linear-gradient(135deg, #8B5CF6 0%, #6366F1 100%);
+        color: #FFFFFF;
+        border-color: #8B5CF6;
+        transform: translateY(-1px);
+        box-shadow: 0 4px 12px rgba(139, 92, 246, 0.35);
+    }
+
+    .btn-action-ai-view:hover i {
+        color: #FFFFFF;
+    }
+
+    .ai-cached-indicator {
+        width: 7px;
+        height: 7px;
+        border-radius: 50%;
+        background-color: #10B981;
+        display: inline-block;
+        box-shadow: 0 0 6px #10B981;
+        margin-left: 2px;
+    }
+
+    /* AI Themed Filters */
+    .ai-filter-card {
+        background: #FFFFFF !important;
+        border: 1px solid #E2E8F0 !important;
+        border-radius: 14px !important;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.04) !important;
+    }
+
+    .form-select:focus, .form-input:focus {
+        border-color: #DC2626 !important;
+        box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.12) !important;
+    }
+
+    .btn-sheet-secondary:hover {
+        background: #F8FAFC !important;
+        border-color: #94A3B8 !important;
+        color: #0F172A !important;
+        transform: translateY(-1px);
+        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
+    }
+
+    /* Single-Line Compact Attached Photos Strip in History Table */
+    .morning-audit-photos-row {
+        background: #FAFAFC;
+        border-bottom: 1.5px solid #E2E8F0;
+    }
+
+    .col-history-photos {
+        padding: 8px 16px 12px 28px !important;
+        border-bottom: 1.5px solid #E2E8F0 !important;
+        vertical-align: middle !important;
+    }
+
+    .history-photos-strip {
+        display: flex !important;
+        flex-direction: row !important;
+        flex-wrap: nowrap !important;
+        align-items: center !important;
+        gap: 10px !important;
+        width: 100% !important;
+        overflow-x: auto !important;
+        white-space: nowrap !important;
+        padding: 3px 0 !important;
+        scrollbar-width: thin;
+    }
+
+    .history-photo-thumb-box {
+        position: relative !important;
+        width: 72px !important;
+        height: 72px !important;
+        min-width: 72px !important;
+        min-height: 72px !important;
+        border-radius: 9px !important;
+        overflow: hidden !important;
+        border: 1.5px solid #CBD5E1 !important;
+        cursor: pointer !important;
+        background: #F1F5F9 !important;
+        box-shadow: 0 1px 4px rgba(0, 0, 0, 0.07) !important;
+        transition: transform 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease !important;
+        flex-shrink: 0 !important;
+    }
+
+    .history-photo-thumb-box:hover {
+        transform: scale(1.06) translateY(-2px) !important;
+        border-color: #2563EB !important;
+        box-shadow: 0 4px 14px rgba(37, 99, 235, 0.28) !important;
+        z-index: 2 !important;
+    }
+
+    .history-photo-thumb {
+        width: 100% !important;
+        height: 100% !important;
+        object-fit: cover !important;
+        display: block !important;
+    }
+
+    .history-photo-badge {
+        position: absolute !important;
+        bottom: 2px !important;
+        right: 2px !important;
+        background: rgba(15, 23, 42, 0.78) !important;
+        color: #FFFFFF !important;
+        font-size: 0.65rem !important;
+        font-weight: 700 !important;
+        padding: 1px 5px !important;
+        border-radius: 4px !important;
+        backdrop-filter: blur(4px) !important;
+        line-height: 1.2 !important;
+    }
+
+    .history-photo-overlay {
+        position: absolute !important;
+        top: 0 !important;
+        left: 0 !important;
+        width: 100% !important;
+        height: 100% !important;
+        background: rgba(15, 23, 42, 0.35) !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        color: #FFFFFF !important;
+        opacity: 0 !important;
+        transition: opacity 0.15s ease !important;
+    }
+
+    .history-photo-thumb-box:hover .history-photo-overlay {
+        opacity: 1 !important;
+    }
+
+    .history-photo-overlay i,
+    .history-photo-overlay svg {
+        width: 22px !important;
+        height: 22px !important;
+    }
+
+    @media (max-width: 768px) {
+        .audit-history-table tbody tr.morning-audit-photos-row {
+            display: block !important;
+            background: transparent !important;
+            border: none !important;
+            padding: 0 !important;
+            margin-top: -6px !important;
+            margin-bottom: 6px !important;
+            width: 100% !important;
+        }
+
+        .audit-history-table tbody td.col-history-photos {
+            display: block !important;
+            padding: 0 !important;
+            border: none !important;
+            width: 100% !important;
+        }
+
+        .history-photos-strip {
+            background: #F8FAFC !important;
+            border: 1px solid #E2E8F0 !important;
+            border-radius: 10px !important;
+            padding: 8px 10px !important;
+            gap: 8px !important;
+        }
+
+        .history-photo-thumb-box {
+            width: 60px !important;
+            height: 60px !important;
+            min-width: 60px !important;
+            min-height: 60px !important;
+        }
+    }
+</style>
+
+<!-- ================= IN-WEBSITE IMAGE LIGHTBOX MODAL (NO NEW TAB) ================= -->
+<div class="inpage-lightbox-overlay" id="inpageLightboxModal" style="display: none;">
+    <div class="lightbox-top-toolbar">
+        <div class="lightbox-title-info">
+            <i data-lucide="image"></i> <span id="lightboxPhotoTitle">รูปถ่ายแนบ Morning Audit</span>
+            <span class="lightbox-counter-badge" id="lightboxCounterBadge">1 / 1</span>
+        </div>
+        <div class="lightbox-actions-right">
+            <button type="button" class="lightbox-btn-action" id="lightboxZoomIn" title="ซูมเข้า">
+                <i data-lucide="zoom-in"></i>
+            </button>
+            <button type="button" class="lightbox-btn-action" id="lightboxZoomOut" title="ซูมออก">
+                <i data-lucide="zoom-out"></i>
+            </button>
+            <button type="button" class="lightbox-btn-action" id="lightboxResetZoom" title="รีเซ็ตขนาด">
+                <i data-lucide="maximize-2"></i>
+            </button>
+            <button type="button" class="lightbox-btn-close" id="lightboxCloseBtn" title="ปิดหน้าต่าง">
+                <i data-lucide="x"></i>
+            </button>
+        </div>
+    </div>
+    <div class="lightbox-body">
+        <button type="button" class="lightbox-nav-btn prev" id="lightboxPrevBtn" title="รูปก่อนหน้า">
+            <i data-lucide="chevron-left"></i>
+        </button>
+        <div class="lightbox-image-wrapper" id="lightboxImageWrapper">
+            <img src="" alt="รูปถ่ายรายงาน" id="lightboxImage" class="lightbox-main-img">
+        </div>
+        <button type="button" class="lightbox-nav-btn next" id="lightboxNextBtn" title="รูปถัดไป">
+            <i data-lucide="chevron-right"></i>
+        </button>
+    </div>
+</div>
+
+<script>
+    // All Photos Map for Lightbox Navigation
+    const allAuditPhotosMap = {
+        {% for item in audits %}
+            {% if item.photos and item.photos|length > 0 %}
+                "{{ item.id }}": {{ item.photos|tojson }},
+            {% endif %}
+        {% endfor %}
+    };
+
+    let currentAuditId = null;
+    let currentPhotoIndex = 0;
+    let currentLightboxZoom = 1.0;
+
+    const inpageLightboxModal = document.getElementById('inpageLightboxModal');
+    const lightboxImage = document.getElementById('lightboxImage');
+    const lightboxPhotoTitle = document.getElementById('lightboxPhotoTitle');
+    const lightboxCounterBadge = document.getElementById('lightboxCounterBadge');
+    const lightboxPrevBtn = document.getElementById('lightboxPrevBtn');
+    const lightboxNextBtn = document.getElementById('lightboxNextBtn');
+    const lightboxCloseBtn = document.getElementById('lightboxCloseBtn');
+    const lightboxZoomIn = document.getElementById('lightboxZoomIn');
+    const lightboxZoomOut = document.getElementById('lightboxZoomOut');
+    const lightboxResetZoom = document.getElementById('lightboxResetZoom');
+
+    function openHistoryLightbox(auditId, index) {
+        currentAuditId = String(auditId);
+        const photos = allAuditPhotosMap[currentAuditId];
+        if (!photos || index < 0 || index >= photos.length) return;
+        currentPhotoIndex = index;
+        currentLightboxZoom = 1.0;
+        updateLightboxView();
+        inpageLightboxModal.style.display = 'flex';
+    }
+
+    function closeHistoryLightbox() {
+        inpageLightboxModal.style.display = 'none';
+        currentLightboxZoom = 1.0;
+    }
+
+    function updateLightboxView() {
+        const photos = allAuditPhotosMap[currentAuditId];
+        if (!photos || !photos[currentPhotoIndex]) return;
+        lightboxImage.src = photos[currentPhotoIndex];
+        lightboxImage.style.transform = `scale(${currentLightboxZoom})`;
+        lightboxPhotoTitle.textContent = `รูปถ่ายแนบ Morning Audit #${currentAuditId} (รูปที่ ${currentPhotoIndex + 1})`;
+        lightboxCounterBadge.textContent = `${currentPhotoIndex + 1} / ${photos.length}`;
+
+        lightboxPrevBtn.style.display = (photos.length > 1) ? 'flex' : 'none';
+        lightboxNextBtn.style.display = (photos.length > 1) ? 'flex' : 'none';
+    }
+
+    if (lightboxCloseBtn) lightboxCloseBtn.addEventListener('click', closeHistoryLightbox);
+    if (lightboxPrevBtn) {
+        lightboxPrevBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const photos = allAuditPhotosMap[currentAuditId];
+            if (!photos) return;
+            currentPhotoIndex = (currentPhotoIndex - 1 + photos.length) % photos.length;
+            currentLightboxZoom = 1.0;
+            updateLightboxView();
+        });
+    }
+    if (lightboxNextBtn) {
+        lightboxNextBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const photos = allAuditPhotosMap[currentAuditId];
+            if (!photos) return;
+            currentPhotoIndex = (currentPhotoIndex + 1) % photos.length;
+            currentLightboxZoom = 1.0;
+            updateLightboxView();
+        });
+    }
+    if (lightboxZoomIn) {
+        lightboxZoomIn.addEventListener('click', () => {
+            currentLightboxZoom = Math.min(currentLightboxZoom + 0.3, 3.0);
+            lightboxImage.style.transform = `scale(${currentLightboxZoom})`;
+        });
+    }
+    if (lightboxZoomOut) {
+        lightboxZoomOut.addEventListener('click', () => {
+            currentLightboxZoom = Math.max(currentLightboxZoom - 0.3, 0.5);
+            lightboxImage.style.transform = `scale(${currentLightboxZoom})`;
+        });
+    }
+    if (lightboxResetZoom) {
+        lightboxResetZoom.addEventListener('click', () => {
+            currentLightboxZoom = 1.0;
+            lightboxImage.style.transform = `scale(${currentLightboxZoom})`;
+        });
+    }
+
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && inpageLightboxModal.style.display === 'flex') {
+            closeHistoryLightbox();
+        } else if (e.key === 'ArrowLeft' && inpageLightboxModal.style.display === 'flex') {
+            const photos = allAuditPhotosMap[currentAuditId];
+            if (photos && photos.length > 1) {
+                currentPhotoIndex = (currentPhotoIndex - 1 + photos.length) % photos.length;
+                currentLightboxZoom = 1.0;
+                updateLightboxView();
+            }
+        } else if (e.key === 'ArrowRight' && inpageLightboxModal.style.display === 'flex') {
+            const photos = allAuditPhotosMap[currentAuditId];
+            if (photos && photos.length > 1) {
+                currentPhotoIndex = (currentPhotoIndex + 1) % photos.length;
+                currentLightboxZoom = 1.0;
+                updateLightboxView();
+            }
+        }
+    });
+
+    document.addEventListener('DOMContentLoaded', () => {
+        if (window.lucide) {
+            lucide.createIcons();
+        }
+    });
+
+    // ================= STAFF AI ANALYSIS MODAL LOGIC =================
+    let currentStaffAiAuditId = null;
+    let currentStaffAiBranch = '';
+
+    async function openStaffAiModal(auditId, branchName, isRefresh = false) {
+        currentStaffAiAuditId = auditId;
+        currentStaffAiBranch = branchName;
+
+        const modal = document.getElementById('staffAiModal');
+        const modalTitle = document.getElementById('staffAiModalBranchTitle');
+        const content = document.getElementById('staffAiModalContent');
+
+        if (modalTitle) modalTitle.textContent = `${branchName} (ID: #${auditId})`;
+        if (modal) modal.style.display = 'flex';
+        document.body.style.overflow = 'hidden';
+
+        // Set Loading state
+        if (content) {
+            content.innerHTML = `
+                <div style="text-align: center; padding: 36px 20px;">
+                    <div class="ai-spin-loader" style="width: 44px; height: 44px; margin: 0 auto 16px auto; border: 4px solid #E0E7FF; border-top-color: #6366F1; border-radius: 50%; animation: spin 0.8s linear infinite;"></div>
+                    <div style="font-size: 1.05rem; font-weight: 700; color: #1E1B4B; margin-bottom: 6px;">${isRefresh ? 'AI กำลังวิเคราะห์รูปภาพพนักงานใหม่...' : 'กำลังโหลดผลวิเคราะห์รูปภาพพนักงาน...'}</div>
+                    <div style="font-size: 0.86rem; color: #64748B;">ตรวจนับจำนวนบุคคลและตรวจสอบความเรียบร้อยของเครื่องแบบ</div>
+                </div>
+            `;
+        }
+        if (window.lucide) lucide.createIcons();
+
+        // Run analysis API
+        await executeStaffAiAnalysis(auditId, branchName, isRefresh);
+    }
+
+    function closeStaffAiModal() {
+        const modal = document.getElementById('staffAiModal');
+        if (modal) modal.style.display = 'none';
+        document.body.style.overflow = '';
+    }
+
+    async function executeStaffAiAnalysis(auditId, branchName, isRefresh = false) {
+        const content = document.getElementById('staffAiModalContent');
+        const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+
+        try {
+            const resp = await fetch(`/morning-audit/${auditId}/ai-staff-analysis`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': csrfToken
+                },
+                body: JSON.stringify({ refresh: isRefresh })
+            });
+            const data = await resp.json();
+
+            if (data.success && data.analysis) {
+                const a = data.analysis;
+                const isMatched = a.is_count_matched;
+                const matchBadge = isMatched
+                    ? '<span style="display: inline-flex; align-items: center; gap: 5px; font-size: 0.82rem; font-weight: 700; color: #15803D; background: #DCFCE7; padding: 4px 10px; border-radius: 6px;"><i data-lucide="check-circle" style="width: 14px; height: 14px;"></i> จำนวนตรงกันถูกต้อง</span>'
+                    : '<span style="display: inline-flex; align-items: center; gap: 5px; font-size: 0.82rem; font-weight: 700; color: #B91C1C; background: #FEE2E2; padding: 4px 10px; border-radius: 6px;"><i data-lucide="alert-circle" style="width: 14px; height: 14px;"></i> จำนวนไม่ตรงกับที่ระบุ</span>';
+
+                let obsHtml = '';
+                if (a.observations && a.observations.length > 0) {
+                    obsHtml = `
+                    <div style="background: #F8FAFC; border-radius: 10px; border: 1px solid #E2E8F0; padding: 14px 16px; margin-top: 14px;">
+                        <div style="font-size: 0.88rem; font-weight: 700; color: #1E293B; margin-bottom: 8px; display: flex; align-items: center; gap: 6px;">
+                            <i data-lucide="clipboard-list" style="width: 16px; height: 16px; color: #6366F1;"></i>
+                            <span>ข้อสังเกตเพิ่มเติมจากการวิเคราะห์ภาพถ่าย:</span>
+                        </div>
+                        <ul style="margin: 0; padding-left: 20px; font-size: 0.88rem; color: #334155; line-height: 1.6;">
+                            ${a.observations.map(o => `<li>${o}</li>`).join('')}
+                        </ul>
+                    </div>`;
+                }
+
+                if (content) {
+                    content.innerHTML = `
+                        <div class="ai-staff-results-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 14px; margin-bottom: 14px;">
+                            <div style="background: #FFFFFF; border-radius: 10px; border: 1.5px solid ${isMatched ? '#86EFAC' : '#FCA5A5'}; padding: 14px 16px; box-shadow: 0 2px 6px rgba(0,0,0,0.02);">
+                                <div style="font-size: 0.82rem; font-weight: 600; color: #64748B; margin-bottom: 4px;">จำนวนพนักงานในภาพ</div>
+                                <div style="display: flex; align-items: baseline; gap: 8px;">
+                                    <span style="font-size: 1.75rem; font-weight: 800; color: #0F172A;">${a.detected_count}</span>
+                                    <span style="font-size: 0.88rem; color: #64748B;">คน</span>
+                                </div>
+                                <div style="margin-top: 8px;">${matchBadge}</div>
+                            </div>
+
+                            <div style="background: #FFFFFF; border-radius: 10px; border: 1.5px solid #CBD5E1; padding: 14px 16px; box-shadow: 0 2px 6px rgba(0,0,0,0.02);">
+                                <div style="font-size: 0.82rem; font-weight: 600; color: #64748B; margin-bottom: 4px;">การแต่งกายและความเรียบร้อย</div>
+                                <div style="font-size: 0.95rem; font-weight: 700; color: #0F172A; margin-bottom: 8px;">
+                                    ${a.dress_code_summary || 'พนักงานแต่งกายเรียบร้อยตามมาตรฐาน'}
+                                </div>
+                                <span style="display: inline-flex; align-items: center; gap: 4px; font-size: 0.78rem; font-weight: 700; color: #4338CA; background: #EEF2FF; padding: 3px 8px; border-radius: 4px;">
+                                    <i data-lucide="shirt" style="width: 12px; height: 12px;"></i> ยูนิฟอร์มบริษัท
+                                </span>
+                            </div>
+                        </div>
+                        ${obsHtml}
+
+                        <div style="display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-top: 20px; padding-top: 14px; border-top: 1px solid #E2E8F0; flex-wrap: wrap;">
+                            <div style="font-size: 0.8rem; color: #64748B;">
+                                ${data.is_cached ? '<i data-lucide="check-check" style="width: 13px; height: 13px; color: #10B981; display: inline-block; vertical-align: middle;"></i> แสดงผลวิเคราะห์ที่บันทึกไว้' : '<i data-lucide="sparkles" style="width: 13px; height: 13px; color: #6366F1; display: inline-block; vertical-align: middle;"></i> วิเคราะห์สดใหม่สำเร็จ'}
+                            </div>
+                            <div style="display: flex; gap: 8px;">
+                                <button type="button" class="btn-sheet-secondary" onclick="openStaffAiModal(${auditId}, '${branchName}', true)" style="padding: 7px 14px; font-size: 0.86rem;" title="ส่งให้ AI ตรวจสอบภาพถ่ายอีกครั้ง">
+                                    <i data-lucide="rotate-ccw"></i> วิเคราะห์ซ้ำอีกครั้ง
+                                </button>
+                                <a href="/morning-audit/${auditId}" class="btn-action-primary" style="background: #2563EB; padding: 7px 16px; font-size: 0.86rem; border-radius: 6px;">
+                                    <i data-lucide="file-text"></i> ดูรายงานฉบับเต็ม
+                                </a>
+                            </div>
+                        </div>
+                    `;
+                }
+
+                // Update row indicator icon
+                const btn = document.getElementById(`btnStaffAi_${auditId}`);
+                if (btn && !btn.querySelector('.ai-cached-indicator')) {
+                    const dot = document.createElement('span');
+                    dot.className = 'ai-cached-indicator';
+                    dot.style.background = '#10B981';
+                    dot.title = 'วิเคราะห์แล้ว';
+                    btn.appendChild(dot);
+                }
+
+                if (window.lucide) lucide.createIcons();
+            } else {
+                if (content) {
+                    content.innerHTML = `
+                        <div style="text-align: center; padding: 30px 16px; color: #EF4444;">
+                            <i data-lucide="alert-circle" style="width: 40px; height: 40px; margin-bottom: 8px;"></i>
+                            <div style="font-weight: 700; font-size: 1rem; margin-bottom: 4px;">ไม่สามารถวิเคราะห์รูปภาพได้</div>
+                            <div style="font-size: 0.86rem; color: #64748B; margin-bottom: 16px;">${data.error || 'เกิดข้อผิดพลาดในการประมวลผล'}</div>
+                            <button type="button" class="btn-action-primary" onclick="executeStaffAiAnalysis(${auditId}, '${branchName}', true)" style="font-size: 0.86rem; padding: 7px 16px;">
+                                <i data-lucide="rotate-ccw"></i> ลองใหม่อีกครั้ง
+                            </button>
+                        </div>
+                    `;
+                    if (window.lucide) lucide.createIcons();
+                }
+            }
+        } catch (err) {
+            if (content) {
+                content.innerHTML = `
+                    <div style="text-align: center; padding: 30px 16px; color: #EF4444;">
+                        <i data-lucide="wifi-off" style="width: 40px; height: 40px; margin-bottom: 8px;"></i>
+                        <div style="font-weight: 700; font-size: 1rem; margin-bottom: 4px;">การเชื่อมต่อผิดพลาด</div>
+                        <div style="font-size: 0.86rem; color: #64748B; margin-bottom: 16px;">${err.message}</div>
+                        <button type="button" class="btn-action-primary" onclick="executeStaffAiAnalysis(${auditId}, '${branchName}', true)" style="font-size: 0.86rem; padding: 7px 16px;">
+                            <i data-lucide="rotate-ccw"></i> ลองใหม่อีกครั้ง
+                        </button>
+                    </div>
+                `;
+                if (window.lucide) lucide.createIcons();
+            }
+        }
+    }
+
+    // ================= ADMIN TABLE VERIFICATION AJAX =================
+    async function handleTableVerification(type, id, markAsVerified) {
+        const url = type === 'morning' ? `/morning-audit/${id}/verify` : `/daily-report/${id}/verify`;
+        const box = document.getElementById(`verifyBox-${type}-${id}`);
+        const actionWrap = document.getElementById(`verifyAction-${type}-${id}`);
+        const hcCb = document.getElementById(`hc-${type}-${id}`);
+        const dcCb = document.getElementById(`dc-${type}-${id}`);
+        const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+
+        const hcVal = hcCb ? hcCb.checked : false;
+        const dcVal = dcCb ? dcCb.checked : false;
+
+        const payload = {
+            is_verified: markAsVerified,
+            headcount_checked: hcVal,
+            dress_code_checked: dcVal
+        };
+
+        try {
+            if (actionWrap) {
+                actionWrap.innerHTML = `
+                    <div style="display: inline-flex; align-items: center; justify-content: center; gap: 4px; width: 100%; padding: 3px; font-size: 0.72rem; color: #64748B;">
+                        <span class="ai-spin-loader" style="width: 11px; height: 11px; border: 2px solid #CBD5E1; border-top-color: #2563EB; border-radius: 50%; display: inline-block; animation: spin 0.8s linear infinite;"></span>
+                        <span>กำลังบันทึก...</span>
+                    </div>
+                `;
+            }
+
+            const resp = await fetch(url, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': csrfToken
+                },
+                body: JSON.stringify(payload)
+            });
+            const res = await resp.json();
+
+            if (res.success) {
+                const isV = res.is_verified;
+                const isHc = res.headcount_checked;
+                const isDc = res.dress_code_checked;
+                const failedCount = (isHc ? 0 : 1) + (isDc ? 0 : 1);
+
+                if (hcCb) hcCb.checked = isHc;
+                if (dcCb) dcCb.checked = isDc;
+
+                if (box) {
+                    box.classList.remove('is-verified-pass', 'is-verified-warn', 'is-verified-fail', 'is-verified');
+                    if (isV) {
+                        if (failedCount === 0) {
+                            box.classList.add('is-verified-pass');
+                        } else if (failedCount === 1) {
+                            box.classList.add('is-verified-warn');
+                        } else {
+                            box.classList.add('is-verified-fail');
+                        }
+                    }
+                }
+
+                if (actionWrap) {
+                    if (isV) {
+                        let badgeBtnHtml = '';
+                        if (failedCount === 0) {
+                            badgeBtnHtml = `
+                                <button type="button" class="btn-verify-badge-action pass" onclick="handleTableVerification('${type}', ${id}, true)" title="ตรวจแล้ว (ผ่านทั้งหมด) - คลิกเพื่อบันทึกซ้ำ">
+                                    <i data-lucide="shield-check" style="width: 12px; height: 12px;"></i>
+                                    <span>ตรวจแล้ว</span>
+                                </button>
+                            `;
+                        } else if (failedCount === 1) {
+                            badgeBtnHtml = `
+                                <button type="button" class="btn-verify-badge-action warn" onclick="handleTableVerification('${type}', ${id}, true)" title="ไม่ผ่าน 1 อัน - คลิกเพื่อบันทึกซ้ำ">
+                                    <i data-lucide="alert-triangle" style="width: 12px; height: 12px;"></i>
+                                    <span>ไม่ผ่าน 1 อัน</span>
+                                </button>
+                            `;
+                        } else {
+                            badgeBtnHtml = `
+                                <button type="button" class="btn-verify-badge-action fail" onclick="handleTableVerification('${type}', ${id}, true)" title="ไม่ผ่าน 2 อัน - คลิกเพื่อบันทึกซ้ำ">
+                                    <i data-lucide="shield-alert" style="width: 12px; height: 12px;"></i>
+                                    <span>ไม่ผ่าน 2 อัน</span>
+                                </button>
+                            `;
+                        }
+
+                        actionWrap.innerHTML = `
+                            <div class="verified-status-pill">
+                                ${badgeBtnHtml}
+                                <button type="button" class="btn-verify-undo" onclick="handleTableVerification('${type}', ${id}, false)" title="ยกเลิกการตรวจ">
+                                    <i data-lucide="rotate-ccw" style="width: 11px; height: 11px;"></i>
+                                </button>
+                            </div>
+                        `;
+                    } else {
+                        actionWrap.innerHTML = `
+                            <button type="button" class="btn-verify-submit" onclick="handleTableVerification('${type}', ${id}, true)" title="คลิกเพื่อบันทึกสถานะตรวจ">
+                                <i data-lucide="check" style="width: 12px; height: 12px;"></i>
+                                <span>ตรวจแล้ว</span>
+                            </button>
+                        `;
+                    }
+                }
+
+                if (window.lucide) lucide.createIcons();
+
+                if (window.Swal) {
+                    let toastTitle = 'ตรวจแล้ว (ผ่าน)';
+                    let toastIcon = 'success';
+                    if (isV) {
+                        if (failedCount === 1) {
+                            toastTitle = 'ไม่ผ่าน 1 อัน';
+                            toastIcon = 'warning';
+                        } else if (failedCount === 2) {
+                            toastTitle = 'ไม่ผ่าน 2 อัน';
+                            toastIcon = 'error';
+                        }
+                    } else {
+                        toastTitle = 'ยกเลิกการตรวจแล้ว';
+                        toastIcon = 'info';
+                    }
+
+                    Swal.fire({
+                        icon: toastIcon,
+                        title: toastTitle,
+                        text: res.message || 'บันทึกเรียบร้อย',
+                        timer: 1600,
+                        showConfirmButton: false,
+                        toast: true,
+                        position: 'top-end'
+                    });
+                }
+            } else {
+                throw new Error(res.error || 'บันทึกไม่สำเร็จ');
+            }
+        } catch (err) {
+            if (actionWrap) {
+                actionWrap.innerHTML = `
+                    <button type="button" class="btn-verify-submit" onclick="handleTableVerification('${type}', ${id}, true)">
+                        <i data-lucide="check" style="width: 12px; height: 12px;"></i>
+                        <span>ลองใหม่</span>
+                    </button>
+                `;
+                if (window.lucide) lucide.createIcons();
+            }
+            if (window.Swal) {
+                Swal.fire({
+                    icon: 'error',
+                    title: 'เกิดข้อผิดพลาด',
+                    text: err.message
+                });
+            }
+        }
+    }
+</script>
+
+<!-- ================= STAFF AI ANALYSIS MODAL ================= -->
+<div class="staff-ai-modal-overlay" id="staffAiModal" style="display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(15, 23, 42, 0.7); backdrop-filter: blur(4px); z-index: 99999; align-items: center; justify-content: center; padding: 20px; box-sizing: border-box;" onclick="if(event.target.id === 'staffAiModal') closeStaffAiModal();">
+    <div class="staff-ai-modal-dialog" style="background: #FFFFFF; border-radius: 16px; width: 100%; max-width: 620px; box-shadow: 0 20px 40px rgba(0,0,0,0.25); overflow: hidden; animation: modalFadeIn 0.2s ease;">
+        <div class="staff-ai-modal-header" style="padding: 16px 20px; background: linear-gradient(135deg, rgba(99, 102, 241, 0.08) 0%, rgba(168, 85, 247, 0.08) 100%); border-bottom: 1px solid #E0E7FF; display: flex; justify-content: space-between; align-items: center;">
+            <div style="display: flex; align-items: center; gap: 10px;">
+                <div style="width: 36px; height: 36px; border-radius: 8px; background: linear-gradient(135deg, #6366F1, #8B5CF6); color: #FFFFFF; display: flex; align-items: center; justify-content: center;">
+                    <i data-lucide="sparkles"></i>
+                </div>
+                <div>
+                    <h3 style="font-size: 1.05rem; font-weight: 700; color: #1E1B4B; margin: 0;">AI วิเคราะห์รูปภาพพนักงาน</h3>
+                    <p style="font-size: 0.8rem; color: #64748B; margin: 0;" id="staffAiModalBranchTitle">-</p>
+                </div>
+            </div>
+            <button type="button" onclick="closeStaffAiModal()" style="background: transparent; border: none; font-size: 1.2rem; cursor: pointer; color: #64748B; padding: 4px 8px; border-radius: 6px;">
+                <i data-lucide="x"></i>
+            </button>
+        </div>
+        <div class="staff-ai-modal-body" id="staffAiModalContent" style="padding: 20px;">
+            <!-- Loaded dynamically -->
+        </div>
+    </div>
+</div>
+
+<style>
+    @keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+    }
+    @keyframes modalFadeIn {
+        from { opacity: 0; transform: scale(0.96); }
+        to { opacity: 1; transform: scale(1); }
+    }
+
+    .btn-action-ai-staff {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 5px;
+        padding: 5px 9px;
+        border-radius: 7px;
+        background: linear-gradient(135deg, rgba(79, 70, 229, 0.07) 0%, rgba(16, 185, 129, 0.07) 100%);
+        color: #4338CA;
+        font-weight: 600;
+        font-size: 0.78rem;
+        text-decoration: none;
+        transition: all 0.2s ease;
+        border: 1px solid #C7D2FE;
+        white-space: nowrap;
+        position: relative;
+        cursor: pointer;
+        width: 100%;
+        box-sizing: border-box;
+    }
+
+    .btn-action-ai-staff i {
+        width: 13px;
+        height: 13px;
+        color: #4F46E5;
+    }
+
+    .btn-action-ai-staff:hover {
+        background: linear-gradient(135deg, #4F46E5 0%, #059669 100%);
+        color: #FFFFFF;
+        border-color: #4F46E5;
+        transform: translateY(-1px);
+        box-shadow: 0 3px 10px rgba(79, 70, 229, 0.3);
+    }
+
+    .btn-action-ai-staff:hover i {
+        color: #FFFFFF;
+    }
+</style>
+{% endblock %}

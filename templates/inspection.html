@@ -1,0 +1,133 @@
+{% extends "app_layout.html" %}
+
+{% block title %}1. การตรวจสอบ - LXP Sale Monitor (Admin){% endblock %}
+
+{% block breadcrumb %}
+    <a href="{{ url_for('dashboard') }}" class="breadcrumb-link">หน้าหลัก</a>
+    <span class="breadcrumb-separator">/</span>
+    <span class="breadcrumb-item">1. การตรวจสอบ (Inspection)</span>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1 class="page-title">1. การตรวจสอบรายการสินค้า</h1>
+        <p class="page-subtitle">พิจารณาอนุมัติหรือไม่อนุมัติรายการที่ผู้ใช้งานส่งเข้ามา</p>
+    </div>
+    <div>
+        <span class="badge-counter-large">
+            <i data-lucide="inbox"></i> รอตรวจสอบ: {{ items|length }} รายการ
+        </span>
+    </div>
+</div>
+
+<div class="content-card">
+    <div class="table-responsive">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>รหัสรายการ</th>
+                    <th>ชื่อรายการสินค้า</th>
+                    <th>หมวดหมู่</th>
+                    <th>จำนวน</th>
+                    <th>ผู้ส่งตรวจ</th>
+                    <th>วันที่ส่ง</th>
+                    <th class="text-center" style="width: 220px;">การดำเนินการตรวจสอบ</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% if items %}
+                    {% for item in items %}
+                        <tr>
+                            <td><span class="code-badge">{{ item.item_code }}</span></td>
+                            <td class="font-medium">{{ item.item_name }}</td>
+                            <td><span class="category-pill">{{ item.category }}</span></td>
+                            <td><strong class="text-white">{{ item.quantity }}</strong> ชิ้น</td>
+                            <td><span class="user-pill">{{ item.submitted_by }}</span></td>
+                            <td class="text-dim text-sm">{{ item.created_at.strftime('%d/%m/%Y %H:%M') if item.created_at else '-' }}</td>
+                            <td class="text-center">
+                                <div class="action-buttons-group">
+                                    <!-- Approve Form -->
+                                    <form action="{{ url_for('inspection_action', item_id=item.id) }}" method="POST" class="inline-action-form">
+                                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                        <input type="hidden" name="action" value="APPROVE">
+                                        <input type="hidden" name="notes" value="ผ่านการตรวจสอบเรียบร้อย">
+                                        <button type="submit" class="btn-sm btn-approve" title="อนุมัติรายการนี้">
+                                            <i data-lucide="check"></i> อนุมัติ
+                                        </button>
+                                    </form>
+
+                                    <!-- Reject Form -->
+                                    <form action="{{ url_for('inspection_action', item_id=item.id) }}" method="POST" class="inline-action-form" onsubmit="return confirmReject(this)">
+                                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                        <input type="hidden" name="action" value="REJECT">
+                                        <input type="hidden" name="notes" id="rejectNoteInput_{{ item.id }}" value="ไม่ผ่านเกณฑ์การตรวจสอบ">
+                                        <button type="button" onclick="openRejectDialog('{{ item.id }}', '{{ item.item_name }}')" class="btn-sm btn-reject" title="ปฏิเสธรายการนี้">
+                                            <i data-lucide="x"></i> ไม่อนุมัติ
+                                        </button>
+                                    </form>
+                                </div>
+                            </td>
+                        </tr>
+                    {% endfor %}
+                {% else %}
+                    <tr>
+                        <td colspan="7" class="table-empty">
+                            <i data-lucide="check-circle" class="empty-icon text-success"></i>
+                            <p>ไม่มีรายการค้างตรวจสอบในขณะนี้</p>
+                            <span class="text-dim text-sm">รายการทั้งหมดได้รับการตรวจสอบครบถ้วนแล้ว</span>
+                        </td>
+                    </tr>
+                {% endif %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Modal for Reject Notes -->
+<div id="rejectModal" class="modal-backdrop" style="display: none;">
+    <div class="modal-box">
+        <div class="modal-header">
+            <h3 class="modal-title"><i data-lucide="alert-triangle" class="modal-icon-danger"></i> ระบุเหตุผลการไม่อนุมัติ</h3>
+            <button type="button" class="modal-close" onclick="closeRejectDialog()"><i data-lucide="x"></i></button>
+        </div>
+        <div class="modal-body">
+            <p id="rejectItemName" class="reject-target-name"></p>
+            <div class="form-group">
+                <label for="rejectNoteText" class="form-label">หมายเหตุ / เหตุผลที่ไม่อนุมัติ:</label>
+                <textarea id="rejectNoteText" class="form-textarea" rows="3" placeholder="ระบุเหตุผล เช่น ข้อมูลไม่ครบถ้วน, สินค้าชำรุด ฯลฯ"></textarea>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button type="button" class="btn-secondary" onclick="closeRejectDialog()">ยกเลิก</button>
+            <button type="button" class="btn-danger" onclick="submitRejectModal()">ยืนยันไม่อนุมัติ</button>
+        </div>
+    </div>
+</div>
+
+<script>
+let currentRejectItemId = null;
+
+function openRejectDialog(itemId, itemName) {
+    currentRejectItemId = itemId;
+    document.getElementById('rejectItemName').textContent = 'รายการ: ' + itemName;
+    document.getElementById('rejectNoteText').value = 'ไม่ผ่านเกณฑ์การตรวจสอบ';
+    document.getElementById('rejectModal').style.display = 'flex';
+}
+
+function closeRejectDialog() {
+    document.getElementById('rejectModal').style.display = 'none';
+    currentRejectItemId = null;
+}
+
+function submitRejectModal() {
+    if (!currentRejectItemId) return;
+    const note = document.getElementById('rejectNoteText').value.trim() || 'ไม่ผ่านเกณฑ์การตรวจสอบ';
+    const form = document.querySelector(`form[action*="/inspection/action/${currentRejectItemId}"]`);
+    if (form) {
+        document.getElementById(`rejectNoteInput_${currentRejectItemId}`).value = note;
+        form.submit();
+    }
+}
+</script>
+{% endblock %}

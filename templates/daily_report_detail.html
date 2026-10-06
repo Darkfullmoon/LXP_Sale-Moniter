@@ -1,0 +1,673 @@
+{% extends "app_layout.html" %}
+
+{% block title %}รายงานการปฏิบัติงาน - FM-MS-224 Rev.00{% endblock %}
+
+{% block breadcrumb %}
+<span class="breadcrumb-item"><a href="{{ url_for('dashboard') }}">หน้าหลัก</a></span>
+<span class="breadcrumb-separator">/</span>
+<span class="breadcrumb-item"><a href="{{ url_for('daily_report_history') }}">ประวัติรายงานการปฏิบัติงาน</a></span>
+<span class="breadcrumb-separator">/</span>
+<span class="breadcrumb-item active">รายงานการปฏิบัติงาน</span>
+{% endblock %}
+
+{% block content %}
+<div class="sheet-form-page-container">
+    <!-- Top Action / Control Toolbar -->
+    <div class="sheet-toolbar-bar">
+        <div class="sheet-toolbar-left">
+            <span class="sheet-toolbar-title">
+                <i data-lucide="file-check"></i> รายงานการปฏิบัติงานสำนักงานขาย
+            </span>
+            <span style="font-size: 0.9rem; color: var(--text-dim); margin-left: 10px;">(สาขา {{ report.branch }} - {{ report.report_date }})</span>
+        </div>
+        <div class="sheet-toolbar-right">
+            <!-- 1. Print / Preview Button -->
+            <button type="button" onclick="openPrintPreviewModal('{{ url_for('daily_report_pdf', report_id=report.id) }}')" class="btn-sheet-quick" title="ดูตัวอย่างเอกสาร & สั่งพิมพ์">
+                <i data-lucide="printer"></i> พิมพ์เอกสาร
+            </button>
+            <a href="{{ url_for('daily_report_history') }}" class="btn-sheet-secondary">
+                <i data-lucide="arrow-left"></i> กลับหน้ารายการ
+            </a>
+        </div>
+    </div>
+
+    <!-- Official White Sheet Container (Matches PDF Document) -->
+    <div class="sheet-paper-container" id="printableSheet">
+        <!-- HEADER SECTION (Matching PDF Header) -->
+        <div class="sheet-header-pdf-layout">
+            <div class="header-pdf-left">
+                <h1 class="daily-report-main-title">รายงานการปฏิบัติงานสำนักงานขาย</h1>
+            </div>
+            <div class="header-pdf-right">
+                <div class="meta-row-pdf">
+                    <span class="meta-label">สาขา</span>
+                    <span class="meta-val-line"><u>&nbsp; {{ report.branch }} &nbsp;</u></span>
+                </div>
+                <div class="meta-row-pdf">
+                    <span class="meta-label">วันที่</span>
+                    <span class="meta-val-line"><u>&nbsp; {{ report.report_date }} &nbsp;</u></span>
+                </div>
+            </div>
+        </div>
+
+        <!-- TABLE CONTAINER -->
+        <div class="sheet-table-wrapper" style="margin-top: 8px;">
+            <table class="daily-sheet-table">
+                <!-- ================= SECTION 1: แผนงานประจำวัน ================= -->
+                <thead>
+                    <tr class="daily-sec-title-row">
+                        <th colspan="4" class="daily-sec-title-cell">
+                            แผนงานประจำวัน
+                            <span class="sec-title-sub">ช่วงเช้า &nbsp;(ก่อนเปิดสำนักงานขาย)</span>
+                        </th>
+                    </tr>
+                    <tr class="daily-col-head-row">
+                        <th style="width: 140px; text-align: left; padding-left: 14px;">จำนวนพนักงาน</th>
+                        <th style="width: 55px; text-align: center;">คน</th>
+                        <th style="text-align: center;">รายชื่อ</th>
+                        <th style="text-align: center;">แผนงานประจำวัน &nbsp;(ช่วงเช้า)</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <!-- Row 1: ทั้งหมด -->
+                    <tr class="daily-headcount-row-1">
+                        <td class="daily-label-cell">ทั้งหมด</td>
+                        <td class="daily-qty-cell">{{ manpower.total.qty if manpower and manpower.total else '0' }}</td>
+                        <td class="daily-names-cell" style="text-align: center;">{{ manpower.total.names if manpower and manpower.total and manpower.total.names else '-' }}</td>
+                        
+                        <!-- Right Column: Morning Brief (Spans 7 Rows) -->
+                        <td rowspan="7" class="daily-textarea-cell" style="vertical-align: top !important; text-align: left !important; padding: 0 !important;">
+                            <div class="mb-container">
+                                <div class="mb-mobile-title">แผนงานประจำวัน (ช่วงเช้า)</div>
+                                <div class="daily-detail-text-box">{{ report.morning_brief.strip() if report.morning_brief else '-' }}</div>
+                            </div>
+                        </td>
+                    </tr>
+
+                    <!-- Row 2: ออกบูธ / นอกสถานที่ -->
+                    <tr class="daily-headcount-row-2">
+                        <td class="daily-label-cell">ออกบูธ/นอกสถานที่</td>
+                        <td class="daily-qty-cell">{{ manpower.offsite.qty if manpower and manpower.offsite else (manpower.booth.qty if manpower and manpower.booth else '0') }}</td>
+                        <td class="daily-names-cell" style="text-align: center;">{{ manpower.offsite.names if manpower and manpower.offsite and manpower.offsite.names else (manpower.booth.names if manpower and manpower.booth and manpower.booth.names else '-') }}</td>
+                    </tr>
+
+                    <!-- Row 3: ประจำบูธ -->
+                    <tr class="daily-headcount-row-3">
+                        <td class="daily-label-cell">ประจำบูธ</td>
+                        <td class="daily-qty-cell">{{ manpower.booth.qty if manpower and manpower.booth else '0' }}</td>
+                        <td class="daily-names-cell" style="text-align: center;">{{ manpower.booth.names if manpower and manpower.booth and manpower.booth.names else '-' }}</td>
+                    </tr>
+
+                    <!-- Row 4: ลากิจ -->
+                    <tr class="daily-headcount-row-4">
+                        <td class="daily-label-cell">ลากิจ</td>
+                        <td class="daily-qty-cell">{{ manpower.personal_leave.qty if manpower and manpower.personal_leave else '0' }}</td>
+                        <td class="daily-names-cell" style="text-align: center;">{{ manpower.personal_leave.names if manpower and manpower.personal_leave and manpower.personal_leave.names else '-' }}</td>
+                    </tr>
+
+                    <!-- Row 5: ลาป่วย -->
+                    <tr class="daily-headcount-row-5">
+                        <td class="daily-label-cell">ลาป่วย</td>
+                        <td class="daily-qty-cell">{{ manpower.sick_leave.qty if manpower and manpower.sick_leave else '0' }}</td>
+                        <td class="daily-names-cell" style="text-align: center;">{{ manpower.sick_leave.names if manpower and manpower.sick_leave and manpower.sick_leave.names else '-' }}</td>
+                    </tr>
+
+                    <!-- Row 6: ลาพักร้อน -->
+                    <tr class="daily-headcount-row-6">
+                        <td class="daily-label-cell">ลาพักร้อน</td>
+                        <td class="daily-qty-cell">{{ manpower.vacation_leave.qty if manpower and manpower.vacation_leave else '0' }}</td>
+                        <td class="daily-names-cell" style="text-align: center;">{{ manpower.vacation_leave.names if manpower and manpower.vacation_leave and manpower.vacation_leave.names else '-' }}</td>
+                    </tr>
+
+                    <!-- Row 7: สลับหยุด -->
+                    <tr class="daily-headcount-row-7">
+                        <td class="daily-label-cell">สลับหยุด</td>
+                        <td class="daily-qty-cell">{{ manpower.dayoff.qty if manpower and manpower.dayoff else '0' }}</td>
+                        <td class="daily-names-cell" style="text-align: center;">{{ manpower.dayoff.names if manpower and manpower.dayoff and manpower.dayoff.names else '-' }}</td>
+                    </tr>
+
+                    <!-- Section 1 Signatures Header -->
+                    <tr class="daily-sign-head-row">
+                        <td colspan="3" class="daily-sign-col-left"><strong>พนักงานเซ็นรับทราบ</strong></td>
+                        <td class="daily-sign-col-right"><strong>ผู้จัดการสำนักงานขาย</strong></td>
+                    </tr>
+
+                    <!-- Section 1 Signatures Body -->
+                    <tr class="daily-signatures-row">
+                        <td colspan="3" class="daily-sign-body-left">
+                            <div class="mobile-sign-section-header">
+                                <strong>พนักงานเซ็นรับทราบ</strong>
+                            </div>
+                            <div class="sign-staff-row-detail">
+                                <span class="staff-idx">1)</span>
+                                <div class="staff-sig-slot">
+                                    {% if team_staff.manager_sig %}
+                                    <img src="{{ team_staff.manager_sig }}" alt="ลายเซ็น" class="sig-preview-mini">
+                                    {% else %}
+                                    <span class="sig-placeholder-dots">...................</span>
+                                    {% endif %}
+                                </div>
+                                <div class="staff-name-slot">
+                                    (&nbsp;&nbsp;<u>{{ team_staff.manager if team_staff.manager else '..............................' }}</u>&nbsp;&nbsp;)
+                                </div>
+                                <span class="staff-pos-label">ผู้จัดการสำนักงานขาย</span>
+                            </div>
+                            <div class="sign-staff-row-detail">
+                                <span class="staff-idx">2)</span>
+                                <div class="staff-sig-slot">
+                                    {% if team_staff.senior_sale_sig %}
+                                    <img src="{{ team_staff.senior_sale_sig }}" alt="ลายเซ็น" class="sig-preview-mini">
+                                    {% else %}
+                                    <span class="sig-placeholder-dots">...................</span>
+                                    {% endif %}
+                                </div>
+                                <div class="staff-name-slot">
+                                    (&nbsp;&nbsp;<u>{{ team_staff.senior_sale if team_staff.senior_sale else '..............................' }}</u>&nbsp;&nbsp;)
+                                </div>
+                                <span class="staff-pos-label">เจ้าหน้าที่ขายอาวุโส</span>
+                            </div>
+                            <div class="sign-staff-row-detail">
+                                <span class="staff-idx">3)</span>
+                                <div class="staff-sig-slot">
+                                    {% if team_staff.coordinator_sig %}
+                                    <img src="{{ team_staff.coordinator_sig }}" alt="ลายเซ็น" class="sig-preview-mini">
+                                    {% else %}
+                                    <span class="sig-placeholder-dots">...................</span>
+                                    {% endif %}
+                                </div>
+                                <div class="staff-name-slot">
+                                    (&nbsp;&nbsp;<u>{{ team_staff.coordinator if team_staff.coordinator else '..............................' }}</u>&nbsp;&nbsp;)
+                                </div>
+                                <span class="staff-pos-label">เจ้าหน้าที่ประสานงานขายและการตลาด</span>
+                            </div>
+                            <div class="sign-staff-row-detail">
+                                <span class="staff-idx">4)</span>
+                                <div class="staff-sig-slot">
+                                    {% if team_staff.architect_sig %}
+                                    <img src="{{ team_staff.architect_sig }}" alt="ลายเซ็น" class="sig-preview-mini">
+                                    {% else %}
+                                    <span class="sig-placeholder-dots">...................</span>
+                                    {% endif %}
+                                </div>
+                                <div class="staff-name-slot">
+                                    (&nbsp;&nbsp;<u>{{ team_staff.architect if team_staff.architect else '..............................' }}</u>&nbsp;&nbsp;)
+                                </div>
+                                <span class="staff-pos-label">สถาปนิกปรับแบบ</span>
+                            </div>
+                        </td>
+                        <td class="daily-sign-body-right">
+                            <div class="mobile-sign-section-header">
+                                <strong>ผู้จัดการสำนักงานขาย</strong>
+                            </div>
+                            <div class="sign-box-center-detail">
+                                <div class="manager-title-vertical">
+                                    <strong>ผู้จัดการสำนักงานขาย</strong>
+                                </div>
+                                <div class="manager-sig-slot">
+                                    {% set s1_mgr_sig = team_staff.manager_sig_s1 or team_staff.manager_s1_sig or team_staff.manager_sig %}
+                                    {% if s1_mgr_sig %}
+                                    <img src="{{ s1_mgr_sig }}" alt="ลายเซ็นผู้จัดการ" class="sig-preview-main">
+                                    {% else %}
+                                    <div class="sig-placeholder-box">........................................</div>
+                                    {% endif %}
+                                </div>
+                                <div class="sign-bracket-line" style="margin-top: 6px;">
+                                    (&nbsp;&nbsp;<u>{{ team_staff.manager_name_s1 if team_staff.manager_name_s1 else (team_staff.manager_s1 if team_staff.manager_s1 else (team_staff.manager if team_staff.manager else '..............................')) }}</u>&nbsp;&nbsp;)
+                                </div>
+                                <div class="manager-sub-pos-vertical" style="margin-top: 4px; font-size: 0.85rem; font-weight: 600; color: #475569;">
+                                    ผู้จัดการสำนักงานขาย
+                                </div>
+                            </div>
+                        </td>
+                    </tr>
+                </tbody>
+
+                <!-- ================= SECTION 2: สรุปงานประจำวัน ================= -->
+                <thead>
+                    <tr class="daily-sec-title-row">
+                        <th colspan="4" class="daily-sec-title-cell">
+                            สรุปงานประจำวัน
+                            <span class="sec-title-sub">สรุป &nbsp;(รายละเอียด)</span>
+                        </th>
+                    </tr>
+                    <tr class="daily-col-head-row">
+                        <th colspan="3" style="text-align: left; padding-left: 14px;">สรุป &nbsp;(รายละเอียด)</th>
+                        <th style="text-align: center;">สรุป &nbsp;(รายละเอียด)</th>
+                    </tr>
+                </thead>
+                <tbody>
+
+                    <!-- Section 2 Content Row -->
+                    <tr>
+                        <!-- Left 3 Columns: Customer Statistics & Additional Tasks -->
+                        <td colspan="3" class="daily-stats-container-cell">
+                            <div class="daily-stat-list">
+                                <div class="daily-stat-row">
+                                    <span>จำนวนลูกค้าที่ได้จาก Call center</span>
+                                    <div class="stat-input-group">
+                                        <span class="stat-val-highlight">&nbsp; {{ stats.call_center if stats.call_center else '0' }} &nbsp;</span>
+                                        <span>ราย</span>
+                                    </div>
+                                </div>
+
+                                <div class="daily-stat-row">
+                                    <span>จำนวนลูกค้า Walk in</span>
+                                    <div class="stat-input-group">
+                                        <span class="stat-val-highlight">&nbsp; {{ stats.walk_in if stats.walk_in else '0' }} &nbsp;</span>
+                                        <span>ราย</span>
+                                    </div>
+                                </div>
+
+                                <div class="daily-stat-row">
+                                    <span>จำนวนลูกค้านัดหมายวันนี้</span>
+                                    <div class="stat-input-group">
+                                        <span class="stat-val-highlight">&nbsp; {{ stats.appointment if stats.appointment else '0' }} &nbsp;</span>
+                                        <span>ราย</span>
+                                    </div>
+                                </div>
+
+                                <div class="daily-stat-row">
+                                    <span>จำนวนลูกค้าจอง</span>
+                                    <div class="stat-input-group">
+                                        <span class="stat-val-highlight">&nbsp; {{ stats.booking if stats.booking else '0' }} &nbsp;</span>
+                                        <span>ราย</span>
+                                    </div>
+                                </div>
+
+                                <div class="daily-stat-row" style="margin-bottom: 2px;">
+                                    <strong>จำนวน Call</strong>
+                                </div>
+
+                                <div class="daily-stat-row">
+                                    <span>ผู้จัดการสำนักงานขาย</span>
+                                    <div class="stat-input-group">
+                                        <span class="stat-val-highlight">&nbsp; {{ stats.call_manager if stats.call_manager else '0' }} &nbsp;</span>
+                                        <span>ราย</span>
+                                    </div>
+                                </div>
+
+                                <div class="daily-stat-row">
+                                    <span>เจ้าหน้าที่ขายอาวุโส</span>
+                                    <div class="stat-input-group">
+                                        <span class="stat-val-highlight">&nbsp; {{ stats.call_senior if stats.call_senior else '0' }} &nbsp;</span>
+                                        <span>ราย</span>
+                                    </div>
+                                </div>
+
+                                <div class="daily-additional-tasks-box">
+                                    <div style="font-weight: 700; margin-bottom: 6px;">งานเพิ่มเติมระหว่างวันที่ต้องทำ:</div>
+                                    <div style="min-height: 38px; padding: 2px 0; font-size: 0.95rem; text-align: left; white-space: pre-line; word-break: break-word; overflow-wrap: anywhere;">{{ report.additional_tasks.strip() if (report.additional_tasks and report.additional_tasks.strip()) else '-' }}</div>
+                                </div>
+                            </div>
+                        </td>
+
+                        <!-- Right Column: Big Daily Summary Textarea -->
+                        <td class="daily-textarea-cell" style="vertical-align: top !important; text-align: left !important; padding: 0 !important;">
+                            <div class="mb-container">
+                                <div class="mb-mobile-title">สรุป &nbsp;(รายละเอียด)</div>
+                                <div class="daily-detail-text-box">{{ report.daily_summary.strip() if report.daily_summary else '-' }}</div>
+                            </div>
+                        </td>
+                    </tr>
+
+                    <!-- Section 2 Signatures Header -->
+                    <tr class="daily-sign-head-row">
+                        <td colspan="3" class="daily-sign-col-left"><strong>พนักงานเซ็นรับทราบ</strong></td>
+                        <td class="daily-sign-col-right"><strong>ผู้จัดการสำนักงานขาย</strong></td>
+                    </tr>
+
+                    <!-- Section 2 Signatures Body -->
+                    <tr class="daily-signatures-row">
+                        <td colspan="3" class="daily-sign-body-left">
+                            <div class="mobile-sign-section-header">
+                                <strong>พนักงานเซ็นรับทราบ</strong>
+                            </div>
+                            <div class="sign-staff-row-detail">
+                                <span class="staff-idx">1)</span>
+                                <div class="staff-sig-slot">
+                                    {% if team_staff.staff_manager_s2_sig %}
+                                    <img src="{{ team_staff.staff_manager_s2_sig }}" alt="ลายเซ็น" class="sig-preview-mini">
+                                    {% else %}
+                                    <span class="sig-placeholder-dots">...................</span>
+                                    {% endif %}
+                                </div>
+                                <div class="staff-name-slot">
+                                    (&nbsp;&nbsp;<u>{{ team_staff.staff_manager_s2 if team_staff.staff_manager_s2 else (team_staff.manager if team_staff.manager else '..............................') }}</u>&nbsp;&nbsp;)
+                                </div>
+                                <span class="staff-pos-label">ผู้จัดการสำนักงานขาย</span>
+                            </div>
+                            <div class="sign-staff-row-detail">
+                                <span class="staff-idx">2)</span>
+                                <div class="staff-sig-slot">
+                                    {% if team_staff.staff_senior_sale_s2_sig %}
+                                    <img src="{{ team_staff.staff_senior_sale_s2_sig }}" alt="ลายเซ็น" class="sig-preview-mini">
+                                    {% else %}
+                                    <span class="sig-placeholder-dots">...................</span>
+                                    {% endif %}
+                                </div>
+                                <div class="staff-name-slot">
+                                    (&nbsp;&nbsp;<u>{{ team_staff.staff_senior_sale_s2 if team_staff.staff_senior_sale_s2 else (team_staff.senior_sale if team_staff.senior_sale else '..............................') }}</u>&nbsp;&nbsp;)
+                                </div>
+                                <span class="staff-pos-label">เจ้าหน้าที่ขายอาวุโส</span>
+                            </div>
+                            <div class="sign-staff-row-detail">
+                                <span class="staff-idx">3)</span>
+                                <div class="staff-sig-slot">
+                                    {% if team_staff.staff_coordinator_s2_sig %}
+                                    <img src="{{ team_staff.staff_coordinator_s2_sig }}" alt="ลายเซ็น" class="sig-preview-mini">
+                                    {% else %}
+                                    <span class="sig-placeholder-dots">...................</span>
+                                    {% endif %}
+                                </div>
+                                <div class="staff-name-slot">
+                                    (&nbsp;&nbsp;<u>{{ team_staff.staff_coordinator_s2 if team_staff.staff_coordinator_s2 else (team_staff.coordinator if team_staff.coordinator else '..............................') }}</u>&nbsp;&nbsp;)
+                                </div>
+                                <span class="staff-pos-label">เจ้าหน้าที่ประสานงานขายและการตลาด</span>
+                            </div>
+                            <div class="sign-staff-row-detail">
+                                <span class="staff-idx">4)</span>
+                                <div class="staff-sig-slot">
+                                    {% if team_staff.staff_architect_s2_sig %}
+                                    <img src="{{ team_staff.staff_architect_s2_sig }}" alt="ลายเซ็น" class="sig-preview-mini">
+                                    {% else %}
+                                    <span class="sig-placeholder-dots">...................</span>
+                                    {% endif %}
+                                </div>
+                                <div class="staff-name-slot">
+                                    (&nbsp;&nbsp;<u>{{ team_staff.staff_architect_s2 if team_staff.staff_architect_s2 else (team_staff.architect if team_staff.architect else '..............................') }}</u>&nbsp;&nbsp;)
+                                </div>
+                                <span class="staff-pos-label">สถาปนิกปรับแบบ</span>
+                            </div>
+                        </td>
+                        <td class="daily-sign-body-right">
+                            <div class="mobile-sign-section-header">
+                                <strong>ผู้จัดการสำนักงานขาย</strong>
+                            </div>
+                            <div class="sign-box-center-detail">
+                                <div class="manager-title-vertical">
+                                    <strong>ผู้จัดการสำนักงานขาย</strong>
+                                </div>
+                                <div class="manager-sig-slot">
+                                    {% set s2_mgr_sig = team_staff.manager_sig_s2 or team_staff.staff_manager_s2_sig or team_staff.manager_sig %}
+                                    {% if s2_mgr_sig %}
+                                    <img src="{{ s2_mgr_sig }}" alt="ลายเซ็นผู้จัดการ" class="sig-preview-main">
+                                    {% else %}
+                                    <div class="sig-placeholder-box">........................................</div>
+                                    {% endif %}
+                                </div>
+                                <div class="sign-bracket-line" style="margin-top: 6px;">
+                                    (&nbsp;&nbsp;<u>&nbsp; {{ team_staff.manager_name_s2 if team_staff.manager_name_s2 else (team_staff.staff_manager_s2 if team_staff.staff_manager_s2 else (team_staff.manager if team_staff.manager else 'ผู้จัดการสำนักงานขาย')) }} &nbsp;</u>&nbsp;&nbsp;)
+                                </div>
+                                <div class="manager-sub-pos-vertical" style="margin-top: 4px; font-size: 0.85rem; font-weight: 600; color: #475569;">
+                                    ผู้จัดการสำนักงานขาย
+                                </div>
+                            </div>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <!-- FOOTER REVISION CODE -->
+        <div class="sheet-rev-code-right" style="margin-top: 8px; text-align: right; font-size: 0.85rem; font-weight: 700; color: #475569;">
+    </div>
+</div>
+
+<!-- ================= IN-PAGE PRINT PREVIEW & EXPORT MODAL ================= -->
+<div class="print-modal-overlay" id="printPreviewModal" onclick="closePrintPreviewOnBackdrop(event)">
+    <div class="print-modal-dialog">
+        <div class="print-modal-header">
+            <div class="print-modal-title">
+                <i data-lucide="printer"></i>
+                <span>ตัวอย่างเอกสารก่อนพิมพ์ (Document Preview) - รายงานการปฏิบัติงาน</span>
+            </div>
+            <div class="print-modal-actions">
+                <!-- Export to PDF Button inside Modal -->
+                <a href="{{ url_for('daily_report_pdf', report_id=report.id, export=1) }}" class="btn-modal-export-pdf" title="ดาวน์โหลดไฟล์ PDF คุณภาพสูง (THSarabun)">
+                    <i data-lucide="download"></i> Export เป็น PDF
+                </a>
+                <!-- Direct Print Button inside Modal -->
+                <button type="button" class="btn-modal-print" onclick="triggerDocumentPrint()" title="สั่งพิมพ์เอกสาร">
+                    <i data-lucide="printer"></i> สั่งพิมพ์
+                </button>
+                <!-- Close Button -->
+                <button type="button" class="btn-modal-close" onclick="closePrintPreviewModal()" title="ปิดหน้าต่าง (Esc)">
+                    <i data-lucide="x"></i> ปิด
+                </button>
+            </div>
+        </div>
+        <div class="print-modal-body" id="printModalBody">
+            <iframe id="printPdfPreviewIframe" class="print-preview-iframe" src="about:blank"></iframe>
+        </div>
+    </div>
+</div>
+
+<style>
+/* ================= ACTION BUTTONS & MODAL STYLES ================= */
+/* Modal Styling */
+.print-modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: rgba(15, 23, 42, 0.75);
+    backdrop-filter: blur(5px);
+    z-index: 99999;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    box-sizing: border-box;
+}
+
+.print-modal-overlay.active {
+    display: flex !important;
+}
+
+.print-modal-dialog {
+    background: #0F172A;
+    border-radius: 14px;
+    width: 100%;
+    max-width: 1060px;
+    height: 90vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+    border: 1px solid #334155;
+}
+
+.print-modal-header {
+    background: #0F172A;
+    color: #FFFFFF;
+    padding: 12px 20px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 14px;
+    flex-wrap: wrap;
+    border-bottom: 1px solid #334155;
+}
+
+.print-modal-title {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 1.02rem;
+    font-weight: 700;
+}
+
+.print-modal-title i, .print-modal-title svg {
+    width: 20px;
+    height: 20px;
+    color: #38BDF8;
+}
+
+.print-modal-actions {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.btn-modal-export-pdf {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: linear-gradient(135deg, #2563EB 0%, #1D4ED8 100%);
+    color: #FFFFFF;
+    border: none;
+    padding: 7px 16px;
+    border-radius: 8px;
+    font-size: 0.88rem;
+    font-weight: 700;
+    text-decoration: none;
+    cursor: pointer;
+    box-shadow: 0 2px 8px rgba(37, 99, 235, 0.3);
+    transition: all 0.2s ease;
+}
+
+.btn-modal-export-pdf:hover {
+    background: #1D4ED8;
+    transform: translateY(-1px);
+    color: #FFFFFF;
+}
+
+.btn-modal-print {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: #DC2626;
+    color: #FFFFFF;
+    border: none;
+    padding: 7px 18px;
+    border-radius: 8px;
+    font-size: 0.88rem;
+    font-weight: 700;
+    cursor: pointer;
+    box-shadow: 0 2px 8px rgba(220, 38, 38, 0.3);
+    transition: all 0.2s ease;
+}
+
+.btn-modal-print:hover {
+    background: #B91C1C;
+    transform: translateY(-1px);
+}
+
+.btn-modal-close {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    background: rgba(255, 255, 255, 0.12);
+    color: #FFFFFF;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    padding: 7px 14px;
+    border-radius: 8px;
+    font-size: 0.88rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.btn-modal-close:hover {
+    background: rgba(255, 255, 255, 0.22);
+}
+
+.print-modal-body {
+    padding: 0;
+    flex: 1;
+    overflow: hidden;
+    background: #475569;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.print-preview-iframe {
+    width: 100%;
+    height: 100%;
+    border: none;
+    background: #FFFFFF;
+}
+
+.manager-title-vertical {
+    font-size: 0.92rem;
+    font-weight: 700;
+    color: #0F172A;
+    margin-bottom: 6px;
+    text-align: center;
+}
+
+.manager-sub-pos-vertical {
+    text-align: center;
+}
+</style>
+
+<script>
+    function openPrintPreviewModal(pdfUrl) {
+        const modal = document.getElementById('printPreviewModal');
+        if (!modal) return;
+        
+        const iframe = document.getElementById('printPdfPreviewIframe');
+        if (iframe && pdfUrl) {
+            if (!iframe.src || iframe.src === 'about:blank' || !iframe.src.includes(pdfUrl)) {
+                iframe.src = pdfUrl + '#view=FitH';
+            }
+        }
+        
+        modal.style.display = 'flex';
+        modal.classList.add('active');
+        document.body.style.overflow = 'hidden';
+        
+        if (window.lucide) {
+            lucide.createIcons();
+        }
+    }
+
+    function closePrintPreviewModal() {
+        const modal = document.getElementById('printPreviewModal');
+        if (modal) {
+            modal.style.display = 'none';
+            modal.classList.remove('active');
+        }
+        document.body.style.overflow = '';
+    }
+
+    function triggerDocumentPrint() {
+        const iframe = document.getElementById('printPdfPreviewIframe');
+        if (iframe && iframe.contentWindow) {
+            try {
+                iframe.contentWindow.focus();
+                iframe.contentWindow.print();
+                return;
+            } catch (err) {
+                console.warn('Iframe print failed, falling back to window.print():', err);
+            }
+        }
+        
+        closePrintPreviewModal();
+        setTimeout(() => {
+            window.print();
+        }, 200);
+    }
+
+    function closePrintPreviewOnBackdrop(e) {
+        if (e.target.id === 'printPreviewModal') {
+            closePrintPreviewModal();
+        }
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+        if (window.lucide) {
+            lucide.createIcons();
+        }
+    });
+
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && document.getElementById('printPreviewModal')?.classList.contains('active')) {
+            closePrintPreviewModal();
+        }
+    });
+</script>
+{% endblock %}

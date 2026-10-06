@@ -1,0 +1,891 @@
+{% extends "app_layout.html" %}
+
+{% block title %}จำนวนลูกค้าประจำสัปดาห์ - LXP Sale Monitor{% endblock %}
+
+{% block breadcrumb %}
+<span class="breadcrumb-item"><a href="{{ url_for('dashboard') }}">หน้าหลัก</a></span>
+<span class="breadcrumb-separator">/</span>
+<span class="breadcrumb-item"><a href="{{ url_for('admin_weekly_customers') }}">ระบบจัดการ</a></span>
+<span class="breadcrumb-separator">/</span>
+<span class="breadcrumb-item active">จำนวนลูกค้าประจำสัปดาห์</span>
+{% endblock %}
+
+{% block content %}
+<div class="weekly-cust-page-container">
+    <!-- Top Filter & Header Toolbar -->
+    <div class="weekly-toolbar-card">
+        <div class="weekly-toolbar-left">
+            <div class="weekly-page-title-group">
+                <div class="weekly-title-icon">
+                    <i data-lucide="users"></i>
+                </div>
+                <div>
+                    <h1 class="weekly-page-title">จำนวนลูกค้าประจำสัปดาห์</h1>
+                    <p class="weekly-page-sub">สรุปรายละเอียดลูกค้า 7 วันจากรายงานประจำวัน</p>
+                </div>
+            </div>
+        </div>
+        <div class="weekly-toolbar-right">
+            <!-- Branch Filter Form -->
+            <form method="GET" action="{{ url_for('admin_weekly_customers') }}" id="branchFilterForm" class="weekly-filter-form">
+                <div class="filter-group-inline">
+                    <label for="branchSelect" class="filter-label"><i data-lucide="map-pin"></i> สาขา:</label>
+                    <select name="branch" id="branchSelect" class="form-select-modern" onchange="document.getElementById('branchFilterForm').submit()">
+                        <option value="ALL" {% if current_branch == 'ALL' or not current_branch %}selected{% endif %}>ทุกสาขา (All Branches)</option>
+                        {% for b in branches %}
+                        {% set b_val = b.name if b is mapping else b %}
+                        <option value="{{ b_val }}" {% if current_branch == b_val %}selected{% endif %}>{{ b_val }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Main Weekly Comparison Dashboard Card -->
+    <div class="weekly-dashboard-container">
+        <div class="weekly-card" id="weeklyCard">
+            <!-- Card Header with Top Navigation Bar -->
+            <div class="weekly-card-header">
+                <div class="card-header-left">
+                    <div class="header-titles-wrap">
+                        <h2 class="weekly-card-main-title">จำนวนลูกค้าประจำสัปดาห์</h2>
+                        <div class="weekly-date-badge" id="weekDateRangeBadge">
+                            <i data-lucide="calendar"></i>
+                            <span id="weekDateRangeText">-</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Top Navigation Controls -->
+                <div class="card-header-nav-group">
+                    <button type="button" class="btn-top-nav btn-nav-prev" id="btnPrevWeek" onclick="navigateWeek(1)" title="สัปดาห์ก่อนหน้า">
+                        <i data-lucide="arrow-left"></i>
+                        <span>ก่อนหน้า</span>
+                    </button>
+                    <button type="button" class="btn-top-nav btn-nav-this-week" id="btnThisWeek" onclick="goToThisWeek()" title="กลับไปสัปดาห์ปัจจุบัน">
+                        <i data-lucide="calendar-check-2"></i>
+                        <span>สัปดาห์นี้</span>
+                    </button>
+                    <button type="button" class="btn-top-nav btn-nav-next" id="btnNextWeek" onclick="navigateWeek(-1)" title="สัปดาห์ถัดไป">
+                        <span>ถัดไป</span>
+                        <i data-lucide="arrow-right"></i>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Card Body: 7-Day Comparison Table with Daily Report Details -->
+            <div class="weekly-card-body">
+                <!-- Empty Week Alert -->
+                <div class="weekly-empty-banner" id="weeklyEmptyBanner" style="display: none;">
+                    <i data-lucide="info"></i>
+                    <span>ยังไม่มีข้อมูลลูกค้าในสัปดาห์นี้</span>
+                </div>
+
+                <!-- 7-Column Comparative Grid Container -->
+                <div class="weekly-comparison-scroll-wrapper">
+                    <div class="weekly-columns-grid" id="weeklyColumnsGrid">
+                        <!-- Populated dynamically by JS -->
+                    </div>
+                </div>
+
+                <!-- Weekly Total Display (Bottom Right Corner as specified) -->
+                <div class="weekly-total-row">
+                    <div class="weekly-total-box">
+                        <span class="weekly-total-label">รวมลูกค้าทั้งสัปดาห์:</span>
+                        <span class="weekly-total-value" id="weeklyTotalValue">0 ราย</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Embedded Data from Server for Zero-Lag Initial Render -->
+<script id="weeklyDataJson" type="application/json">
+{{ weeks|tojson }}
+</script>
+
+<style>
+/* ================= STYLES FOR WEEKLY COMPARISON DASHBOARD ================= */
+.weekly-cust-page-container {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    width: 100%;
+    max-width: 1240px;
+    margin: 0 auto;
+    box-sizing: border-box;
+}
+
+/* Toolbar Card */
+.weekly-toolbar-card {
+    background: #FFFFFF;
+    border: 1px solid #E2E8F0;
+    border-radius: 16px;
+    padding: 16px 22px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.03);
+    flex-wrap: wrap;
+}
+
+.weekly-toolbar-left {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+}
+
+.weekly-page-title-group {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+}
+
+.weekly-title-icon {
+    width: 46px;
+    height: 46px;
+    border-radius: 12px;
+    background: linear-gradient(135deg, #DC2626 0%, #991B1B 100%);
+    color: #FFFFFF;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 4px 12px rgba(220, 38, 38, 0.25);
+    flex-shrink: 0;
+}
+
+.weekly-title-icon i,
+.weekly-title-icon svg {
+    width: 24px;
+    height: 24px;
+}
+
+.weekly-page-title {
+    font-size: 1.35rem;
+    font-weight: 700;
+    color: #0F172A;
+    margin: 0 0 2px 0;
+}
+
+.weekly-page-sub {
+    font-size: 0.86rem;
+    color: #64748B;
+    margin: 0;
+}
+
+.weekly-toolbar-right {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.weekly-filter-form {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin: 0;
+    flex-wrap: wrap;
+}
+
+.filter-group-inline {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: #F8FAFC;
+    border: 1px solid #CBD5E1;
+    border-radius: 10px;
+    padding: 4px 10px;
+}
+
+.filter-label {
+    font-size: 0.84rem;
+    font-weight: 600;
+    color: #475569;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.filter-label i, .filter-label svg {
+    width: 14px;
+    height: 14px;
+    color: #DC2626;
+}
+
+.form-select-modern {
+    border: none;
+    background: transparent;
+    font-size: 0.88rem;
+    font-weight: 600;
+    color: #0F172A;
+    outline: none;
+    cursor: pointer;
+    padding: 4px 2px;
+}
+
+/* ================= MAIN WEEKLY CARD ================= */
+.weekly-dashboard-container {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    width: 100%;
+}
+
+.weekly-card {
+    background: #FFFFFF;
+    border: 1px solid #E2E8F0;
+    border-radius: 20px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+    overflow: hidden;
+    transition: opacity 0.2s ease, transform 0.2s ease;
+    display: flex;
+    flex-direction: column;
+}
+
+/* Card Header with Top Navigation */
+.weekly-card-header {
+    background: linear-gradient(135deg, #1E293B 0%, #0F172A 100%);
+    color: #FFFFFF;
+    padding: 16px 24px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    flex-wrap: wrap;
+}
+
+.card-header-left {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+}
+
+.header-titles-wrap {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.weekly-card-main-title {
+    font-size: 1.2rem;
+    font-weight: 700;
+    color: #FFFFFF;
+    margin: 0;
+    letter-spacing: 0.2px;
+}
+
+.weekly-date-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: rgba(255, 255, 255, 0.14);
+    border: 1px solid rgba(255, 255, 255, 0.22);
+    color: #FFFFFF;
+    font-size: 0.9rem;
+    font-weight: 600;
+    padding: 4px 12px;
+    border-radius: 8px;
+    backdrop-filter: blur(6px);
+}
+
+.weekly-date-badge i,
+.weekly-date-badge svg {
+    width: 15px;
+    height: 15px;
+    color: #F87171;
+}
+
+/* Top Navigation Controls */
+.card-header-nav-group {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.btn-top-nav {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 7px 14px;
+    background: rgba(255, 255, 255, 0.12);
+    border: 1px solid rgba(255, 255, 255, 0.24);
+    color: #FFFFFF;
+    border-radius: 10px;
+    font-size: 0.86rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    backdrop-filter: blur(4px);
+}
+
+.btn-top-nav:hover:not(:disabled) {
+    background: #DC2626;
+    border-color: #DC2626;
+    color: #FFFFFF;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(220, 38, 38, 0.35);
+}
+
+.btn-top-nav:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+    background: rgba(255, 255, 255, 0.05);
+    border-color: rgba(255, 255, 255, 0.1);
+    color: rgba(255, 255, 255, 0.5);
+}
+
+.btn-nav-this-week.is-current-week {
+    background: #DC2626;
+    border-color: #EF4444;
+    color: #FFFFFF;
+    box-shadow: 0 2px 8px rgba(220, 38, 38, 0.4);
+}
+
+.btn-top-nav i,
+.btn-top-nav svg {
+    width: 15px;
+    height: 15px;
+}
+
+/* Card Body */
+.weekly-card-body {
+    padding: 24px 24px 20px 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+}
+
+.weekly-empty-banner {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: #FEF3C7;
+    border: 1px solid #FDE68A;
+    color: #92400E;
+    padding: 10px 16px;
+    border-radius: 12px;
+    font-size: 0.9rem;
+    font-weight: 600;
+}
+
+.weekly-empty-banner i,
+.weekly-empty-banner svg {
+    width: 18px;
+    height: 18px;
+    color: #D97706;
+}
+
+/* Comparison Scroll Wrapper */
+.weekly-comparison-scroll-wrapper {
+    width: 100%;
+    overflow-x: auto;
+    padding-bottom: 6px;
+    box-sizing: border-box;
+}
+
+/* 7-Columns Grid Container */
+.weekly-columns-grid {
+    display: grid;
+    grid-template-columns: repeat(7, minmax(145px, 1fr));
+    gap: 10px;
+    width: 100%;
+    min-width: 1020px; /* Ensures all 7 columns remain perfectly aligned */
+    box-sizing: border-box;
+}
+
+/* Individual Day Column Card */
+.day-compare-column {
+    background: #FFFFFF;
+    border: 1.5px solid #E2E8F0;
+    border-radius: 14px;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    transition: all 0.2s ease;
+    box-sizing: border-box;
+}
+
+.day-compare-column.has-data {
+    border-color: #CBD5E1;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+}
+
+.day-compare-column.is-today {
+    border-color: #DC2626;
+}
+
+/* Day Column Header */
+.day-col-top {
+    background: #F1F5F9;
+    border-bottom: 1.5px solid #E2E8F0;
+    padding: 12px 10px;
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.day-name-text {
+    font-size: 0.96rem;
+    font-weight: 700;
+    color: #0F172A;
+}
+
+.day-date-text {
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: #64748B;
+}
+
+/* Total Customer Hero in Column */
+.day-total-hero {
+    padding: 12px 10px;
+    background: #F8FAFC;
+    border-bottom: 1px solid #E2E8F0;
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.day-total-hero-label {
+    font-size: 0.74rem;
+    font-weight: 600;
+    color: #64748B;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+}
+
+.day-total-hero-val {
+    font-size: 1.45rem;
+    font-weight: 900;
+    color: #0F172A;
+    line-height: 1.1;
+}
+
+.day-compare-column.has-data .day-total-hero-val {
+    color: #DC2626;
+}
+
+.day-total-hero-unit {
+    font-size: 0.76rem;
+    font-weight: 600;
+    color: #64748B;
+}
+
+/* Section Header inside Column */
+.day-details-sec-header {
+    background: #F8FAFC;
+    padding: 7px 10px;
+    font-size: 0.78rem;
+    font-weight: 700;
+    color: #475569;
+    border-bottom: 1px solid #E2E8F0;
+    text-align: center;
+    letter-spacing: 0.2px;
+}
+
+/* Breakdown Detail Items List */
+.day-details-list {
+    display: flex;
+    flex-direction: column;
+    padding: 4px 0;
+    flex: 1;
+    background: #FFFFFF;
+}
+
+.detail-line-item {
+    display: flex;
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 10px;
+    border-bottom: 1px dashed #E2E8F0;
+    gap: 6px;
+}
+
+.detail-line-item:last-child {
+    border-bottom: none;
+}
+
+.detail-item-title {
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: #475569;
+    line-height: 1.2;
+    white-space: nowrap;
+    text-align: left;
+}
+
+.detail-item-value-box {
+    display: flex;
+    align-items: baseline;
+    justify-content: flex-end;
+    gap: 3px;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
+.detail-item-val {
+    font-size: 0.95rem;
+    font-weight: 800;
+    color: #0F172A;
+}
+
+.detail-item-unit {
+    font-size: 0.75rem;
+    font-weight: 500;
+    color: #64748B;
+}
+
+/* Sub-category for Calls */
+.detail-sub-group {
+    background: #F8FAFC;
+    border-top: 1px solid #E2E8F0;
+    border-bottom: 1px solid #E2E8F0;
+    padding: 8px 10px 6px 10px;
+}
+
+.detail-sub-group-title {
+    font-size: 0.78rem;
+    font-weight: 700;
+    color: #334155;
+    margin-bottom: 4px;
+    text-align: left;
+}
+
+.detail-sub-line {
+    display: flex;
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+    padding: 3px 0 3px 6px;
+    font-size: 0.76rem;
+}
+
+.detail-sub-label {
+    color: #64748B;
+    font-weight: 500;
+    white-space: nowrap;
+}
+
+.detail-sub-val {
+    font-weight: 700;
+    color: #0F172A;
+    white-space: nowrap;
+}
+
+/* Weekly Total Section (Bottom Right Corner as specified) */
+.weekly-total-row {
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    padding: 16px 4px 6px 4px;
+    border-top: 2px dashed #E2E8F0;
+    margin-top: 4px;
+}
+
+.weekly-total-box {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 10px;
+    background: linear-gradient(135deg, #FEF2F2 0%, #FEE2E2 100%);
+    border: 2px solid #FECACA;
+    padding: 10px 22px;
+    border-radius: 14px;
+    box-shadow: 0 4px 14px rgba(220, 38, 38, 0.08);
+}
+
+.weekly-total-label {
+    font-size: 1.05rem;
+    font-weight: 700;
+    color: #991B1B;
+}
+
+.weekly-total-value {
+    font-size: 1.55rem;
+    font-weight: 900;
+    color: #DC2626;
+    letter-spacing: -0.5px;
+}
+
+/* ================= RESPONSIVE DESIGN ================= */
+@media (max-width: 900px) {
+    .weekly-card-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 12px;
+    }
+
+    .card-header-nav-group {
+        width: 100%;
+        justify-content: space-between;
+    }
+}
+
+@media (max-width: 768px) {
+    .weekly-toolbar-card {
+        padding: 12px 14px;
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .weekly-toolbar-right {
+        width: 100%;
+    }
+
+    .weekly-filter-form {
+        width: 100%;
+    }
+
+    .filter-group-inline {
+        width: 100%;
+        justify-content: space-between;
+        box-sizing: border-box;
+    }
+
+    .weekly-card-header {
+        padding: 14px 16px;
+    }
+
+    .card-header-nav-group {
+        display: grid;
+        grid-template-columns: 1fr 1fr 1fr;
+        gap: 6px;
+        width: 100%;
+    }
+
+    .btn-top-nav {
+        justify-content: center;
+        padding: 7px 8px;
+        font-size: 0.82rem;
+    }
+
+    .weekly-card-body {
+        padding: 16px 14px 14px 14px;
+    }
+
+    .weekly-total-row {
+        justify-content: center;
+        width: 100%;
+        box-sizing: border-box;
+    }
+
+    .weekly-total-box {
+        width: 100%;
+        justify-content: space-between;
+        padding: 10px 14px;
+        box-sizing: border-box;
+    }
+
+    .weekly-total-value {
+        font-size: 1.35rem;
+    }
+}
+</style>
+
+<script>
+// ================= JAVASCRIPT LOGIC FOR WEEKLY CUSTOMERS =================
+let allWeeks = [];
+let currentWeekIdx = 0; // 0 is most recent / current week
+
+// Initialize on page load
+document.addEventListener('DOMContentLoaded', () => {
+    try {
+        const rawJson = document.getElementById('weeklyDataJson').textContent;
+        allWeeks = JSON.parse(rawJson);
+    } catch (e) {
+        console.error('Error parsing weekly data:', e);
+        allWeeks = [];
+    }
+
+    if (allWeeks.length > 0) {
+        renderWeek(0);
+    } else {
+        renderEmptyState();
+    }
+});
+
+// Render the selected week
+function renderWeek(idx) {
+    if (idx < 0 || idx >= allWeeks.length) return;
+    currentWeekIdx = idx;
+    const week = allWeeks[idx];
+
+    // Update Header Date Range
+    document.getElementById('weekDateRangeText').textContent = week.week_label || '-';
+    const weekIndexEl = document.getElementById('weekIndexText');
+    if (weekIndexEl) {
+        weekIndexEl.textContent = `สัปดาห์ ${week.week_index} / ${week.total_weeks}`;
+    }
+
+    // Update Empty Banner
+    const emptyBanner = document.getElementById('weeklyEmptyBanner');
+    if (week.is_empty) {
+        emptyBanner.style.display = 'flex';
+    } else {
+        emptyBanner.style.display = 'none';
+    }
+
+    // Render 7-Column Comparative Grid
+    const gridContainer = document.getElementById('weeklyColumnsGrid');
+    gridContainer.innerHTML = '';
+
+    week.days.forEach((day) => {
+        const col = document.createElement('div');
+        col.className = `day-compare-column ${day.count > 0 ? 'has-data' : ''}`;
+
+        const shortDate = day.day_date_short || day.formatted_date || '';
+        const b = day.breakdown || {};
+
+        col.innerHTML = `
+            <!-- 1. Header: Day Name & Date -->
+            <div class="day-col-top">
+                <span class="day-name-text">${day.day_name}</span>
+                <span class="day-date-text">${shortDate}</span>
+            </div>
+
+            <!-- 2. Hero Total: ลูกค้ารวม -->
+            <div class="day-total-hero">
+                <span class="day-total-hero-label">ลูกค้ารวม</span>
+                <span class="day-total-hero-val">${day.count}</span>
+                <span class="day-total-hero-unit">ราย</span>
+            </div>
+
+            <!-- 3. Section Title: รายละเอียด -->
+            <div class="day-details-sec-header">รายละเอียด</div>
+
+            <!-- 4. Daily Report Detail Rows (Direct from FM-MS-224 Daily Report) -->
+            <div class="day-details-list">
+                <!-- Call Center -->
+                <div class="detail-line-item">
+                    <span class="detail-item-title">Call Center</span>
+                    <div class="detail-item-value-box">
+                        <span class="detail-item-val">${b.call_center || 0}</span>
+                        <span class="detail-item-unit">ราย</span>
+                    </div>
+                </div>
+
+                <!-- Walk-in -->
+                <div class="detail-line-item">
+                    <span class="detail-item-title">Walk in</span>
+                    <div class="detail-item-value-box">
+                        <span class="detail-item-val">${b.walk_in || 0}</span>
+                        <span class="detail-item-unit">ราย</span>
+                    </div>
+                </div>
+
+                <!-- นัดหมายวันนี้ -->
+                <div class="detail-line-item">
+                    <span class="detail-item-title">นัดหมายวันนี้</span>
+                    <div class="detail-item-value-box">
+                        <span class="detail-item-val">${b.appointment || 0}</span>
+                        <span class="detail-item-unit">ราย</span>
+                    </div>
+                </div>
+
+                <!-- ลูกค้าจอง -->
+                <div class="detail-line-item">
+                    <span class="detail-item-title">ลูกค้าจอง</span>
+                    <div class="detail-item-value-box">
+                        <span class="detail-item-val">${b.booking || 0}</span>
+                        <span class="detail-item-unit">ราย</span>
+                    </div>
+                </div>
+
+                <!-- จำนวน Call (ผู้จัดการ / เจ้าหน้าที่ขายอาวุโส) -->
+                <div class="detail-sub-group">
+                    <div class="detail-sub-group-title">จำนวน Call:</div>
+                    <div class="detail-sub-line">
+                        <span class="detail-sub-label">ผู้จัดการ</span>
+                        <span class="detail-sub-val">${b.call_manager || 0} ราย</span>
+                    </div>
+                    <div class="detail-sub-line">
+                        <span class="detail-sub-label">Sale อาวุโส</span>
+                        <span class="detail-sub-val">${b.call_senior || 0} ราย</span>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        gridContainer.appendChild(col);
+    });
+
+    // Update Total (Bottom Right)
+    document.getElementById('weeklyTotalValue').textContent = `${week.total_customers.toLocaleString()} ราย`;
+
+    // Update Navigation Buttons
+    const btnPrev = document.getElementById('btnPrevWeek');
+    const btnNext = document.getElementById('btnNextWeek');
+    const btnThisWeek = document.getElementById('btnThisWeek');
+
+    btnPrev.disabled = (idx >= allWeeks.length - 1);
+    btnNext.disabled = (idx <= 0);
+
+    if (idx === 0) {
+        btnThisWeek.classList.add('is-current-week');
+        btnThisWeek.title = 'กำลังดูสัปดาห์ปัจจุบัน';
+    } else {
+        btnThisWeek.classList.remove('is-current-week');
+        btnThisWeek.title = 'คลิกเพื่อกลับมาสัปดาห์ปัจจุบัน';
+    }
+
+    // Re-initialize lucide icons
+    if (window.lucide && typeof window.lucide.createIcons === 'function') {
+        window.lucide.createIcons();
+    }
+}
+
+// Navigate Next / Previous week
+function navigateWeek(delta) {
+    const targetIdx = currentWeekIdx + delta;
+    if (targetIdx >= 0 && targetIdx < allWeeks.length) {
+        const card = document.getElementById('weeklyCard');
+        card.style.opacity = '0.5';
+        card.style.transform = delta > 0 ? 'translateX(-6px)' : 'translateX(6px)';
+        
+        setTimeout(() => {
+            renderWeek(targetIdx);
+            card.style.opacity = '1';
+            card.style.transform = 'translateX(0)';
+        }, 120);
+    }
+}
+
+// Jump immediately to Current Week (This Week)
+function goToThisWeek() {
+    if (currentWeekIdx !== 0) {
+        navigateWeek(-currentWeekIdx);
+    }
+}
+
+// Empty state handler
+function renderEmptyState() {
+    document.getElementById('weekDateRangeText').textContent = 'ไม่มีข้อมูล';
+    const weekIndexEl = document.getElementById('weekIndexText');
+    if (weekIndexEl) {
+        weekIndexEl.textContent = 'สัปดาห์ 0 / 0';
+    }
+    document.getElementById('weeklyEmptyBanner').style.display = 'flex';
+    document.getElementById('weeklyColumnsGrid').innerHTML = '<div style="grid-column: 1 / -1; text-align: center; padding: 30px; color: #94A3B8;">ยังไม่มีข้อมูลรายงานการปฏิบัติงานในระบบ</div>';
+    document.getElementById('weeklyTotalValue').textContent = '0 ราย';
+}
+
+// Keyboard shortcuts (Left/Right arrow navigates week)
+document.addEventListener('keydown', (e) => {
+    if (e.key === 'ArrowLeft') {
+        navigateWeek(1); // Previous week
+    } else if (e.key === 'ArrowRight') {
+        navigateWeek(-1); // Next week
+    } else if (e.key === 'Home') {
+        goToThisWeek(); // This week
+    }
+});
+</script>
+{% endblock %}

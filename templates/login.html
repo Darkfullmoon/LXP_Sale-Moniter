@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+
+{% block title %}เข้าสู่ระบบ - LXP Sale Monitor{% endblock %}
+
+{% block content %}
+<div class="auth-card">
+    <div class="auth-header">
+        <div class="auth-logo-wrapper" style="margin-bottom: 14px; display: flex; justify-content: center; align-items: center;">
+            <img src="{{ url_for('static', filename='img/landy_logo.png') }}" alt="Landy Home Logo" class="auth-brand-logo" style="max-height: 60px; width: auto; object-fit: contain; filter: drop-shadow(0 4px 12px rgba(220, 38, 38, 0.22));">
+        </div>
+        <h1 class="auth-title">เข้าสู่ระบบ</h1>
+        <p class="auth-subtitle">LXP Sale Monitor Platform</p>
+    </div>
+
+    <form action="{{ url_for('login') }}" method="POST" class="auth-form" id="loginForm" novalidate>
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <!-- Username Field -->
+        <div class="form-group">
+            <label for="username" class="form-label">
+                <span>ชื่อผู้ใช้</span>
+            </label>
+            <div class="input-wrapper">
+                <i data-lucide="user" class="input-icon"></i>
+                <input type="text" id="username" name="username" class="form-input uppercase-only"
+                    value="{{ username or '' }}" required autocomplete="username" maxlength="3"
+                    style="letter-spacing: 2px; text-transform: uppercase;">
+            </div>
+            <div class="input-validation-msg" id="usernameValidationMsg"></div>
+        </div>
+
+        <!-- Password Field -->
+        <div class="form-group">
+            <label for="password" class="form-label">
+                <span>รหัสผ่าน</span>
+            </label>
+            <div class="input-wrapper">
+                <i data-lucide="lock" class="input-icon"></i>
+                <input type="password" id="password" name="password" class="form-input" required
+                    autocomplete="current-password">
+                <button type="button" class="btn-toggle-password" onclick="togglePasswordVisibility('password', this)"
+                    tabindex="-1">
+                    <i data-lucide="eye" class="toggle-icon"></i>
+                </button>
+            </div>
+            <div class="input-validation-msg" id="passwordValidationMsg"></div>
+        </div>
+
+        <!-- Submit Button -->
+        <button type="submit" class="btn-submit" id="submitBtn">
+            <span>เข้าสู่ระบบ</span>
+            <i data-lucide="arrow-right" class="btn-icon"></i>
+        </button>
+    </form>
+</div>
+{% endblock %}

@@ -1,0 +1,129 @@
+{% extends "base.html" %}
+
+{% block title %}สร้างบัญชีใหม่ - LXP Sale Monitor{% endblock %}
+
+{% block content %}
+<div class="auth-card">
+    <div class="auth-header">
+        <div class="logo-badge">
+            <i data-lucide="user-plus" class="badge-icon"></i>
+        </div>
+        <h1 class="auth-title">สร้างบัญชีผู้ใช้</h1>
+        <p class="auth-subtitle">สมัครสมาชิกสำหรับระบบ LXP Monitor</p>
+    </div>
+
+    <!-- Navigation Tabs -->
+    <div class="auth-tabs" style="display: flex; gap: 8px; margin-bottom: 20px;">
+        <a href="{{ url_for('login') }}" class="tab-btn" style="flex: 1; text-align: center;">
+            <i data-lucide="log-in" class="tab-icon"></i> เข้าสู่ระบบ
+        </a>
+        <a href="{{ url_for('register') }}" class="tab-btn active" style="flex: 1; text-align: center;">
+            <i data-lucide="user-plus" class="tab-icon"></i> สร้างบัญชี
+        </a>
+    </div>
+
+    <form action="{{ url_for('register') }}" method="POST" class="auth-form" id="registerForm" novalidate>
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <!-- Username Field -->
+        <div class="form-group">
+            <label for="username" class="form-label">
+                <span>ชื่อผู้ใช้ (USERNAME)</span>
+            </label>
+            <div class="input-wrapper">
+                <i data-lucide="user" class="input-icon"></i>
+                <input 
+                    type="text" 
+                    id="username" 
+                    name="username" 
+                    class="form-input uppercase-only" 
+                    value="{{ username or '' }}" 
+                    required 
+                    autocomplete="off"
+                    maxlength="3"
+                    style="letter-spacing: 2px; text-transform: uppercase;"
+                >
+            </div>
+            <div class="input-validation-msg" id="usernameValidationMsg"></div>
+        </div>
+
+        <!-- Password Field -->
+        <div class="form-group">
+            <label for="password" class="form-label">
+                <span>รหัสผ่าน (PASSWORD)</span>
+            </label>
+            <div class="input-wrapper">
+                <i data-lucide="lock" class="input-icon"></i>
+                <input 
+                    type="password" 
+                    id="password" 
+                    name="password" 
+                    class="form-input password-strength-input" 
+                    required 
+                    autocomplete="new-password"
+                >
+                <button type="button" class="btn-toggle-password" onclick="togglePasswordVisibility('password', this)" tabindex="-1">
+                    <i data-lucide="eye" class="toggle-icon"></i>
+                </button>
+            </div>
+            <div class="input-validation-msg" id="passwordValidationMsg"></div>
+
+            <!-- Password Requirements Checklist -->
+            <div class="password-requirements-card" style="margin-top: 8px; padding: 10px; background: rgba(255,255,255,0.03); border: 1px solid var(--border-subtle); border-radius: 8px; font-size: 0.8rem;">
+                <div style="font-weight: 600; margin-bottom: 6px; color: var(--text-muted);">เงื่อนไขความปลอดภัยรหัสผ่าน:</div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 4px;">
+                    <div id="req-length" class="req-item" style="color: var(--text-muted); display: flex; align-items: center; gap: 4px;">
+                        <i data-lucide="circle" style="width: 12px; height: 12px;"></i> ความยาว 8 ตัวขึ้นไป
+                    </div>
+                    <div id="req-upper" class="req-item" style="color: var(--text-muted); display: flex; align-items: center; gap: 4px;">
+                        <i data-lucide="circle" style="width: 12px; height: 12px;"></i> ตัวพิมพ์ใหญ่ (A-Z)
+                    </div>
+                    <div id="req-lower" class="req-item" style="color: var(--text-muted); display: flex; align-items: center; gap: 4px;">
+                        <i data-lucide="circle" style="width: 12px; height: 12px;"></i> ตัวพิมพ์เล็ก (a-z)
+                    </div>
+                    <div id="req-number" class="req-item" style="color: var(--text-muted); display: flex; align-items: center; gap: 4px;">
+                        <i data-lucide="circle" style="width: 12px; height: 12px;"></i> ตัวเลข (0-9)
+                    </div>
+                    <div id="req-special" class="req-item" style="grid-column: span 2; color: var(--text-muted); display: flex; align-items: center; gap: 4px;">
+                        <i data-lucide="circle" style="width: 12px; height: 12px;"></i> อักขระพิเศษ (!@#$%^&*...)
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Confirm Password Field -->
+        <div class="form-group">
+            <label for="confirm_password" class="form-label">
+                <span>ยืนยันรหัสผ่าน</span>
+            </label>
+            <div class="input-wrapper">
+                <i data-lucide="check-check" class="input-icon"></i>
+                <input 
+                    type="password" 
+                    id="confirm_password" 
+                    name="confirm_password" 
+                    class="form-input" 
+                    required 
+                    autocomplete="new-password"
+                >
+                <button type="button" class="btn-toggle-password" onclick="togglePasswordVisibility('confirm_password', this)" tabindex="-1">
+                    <i data-lucide="eye" class="toggle-icon"></i>
+                </button>
+            </div>
+            <div class="input-validation-msg" id="confirmPasswordValidationMsg"></div>
+        </div>
+
+        <!-- Submit Button -->
+        <button type="submit" class="btn-submit" id="submitBtn">
+            <span>ยืนยันการลงทะเบียน</span>
+            <i data-lucide="user-check" class="btn-icon"></i>
+        </button>
+    </form>
+
+    <div class="auth-footer">
+        <p class="rules-hint">
+            <i data-lucide="shield-check" class="hint-icon"></i>
+            รหัสผ่านใหม่จะถูกจัดเก็บอย่างปลอดภัยและมีอายุ <strong>3 เดือน</strong>
+        </p>
+    </div>
+</div>
+{% endblock %}

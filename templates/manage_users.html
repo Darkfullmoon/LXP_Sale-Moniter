@@ -36,7 +36,7 @@
                 <select name="branch" onchange="document.getElementById('userFilterForm').submit()" style="padding: 8px 12px; border: 1px solid #CBD5E1; border-radius: 8px; font-size: 0.88rem; font-weight: 600; color: #1E293B; outline: none; cursor: pointer; background: #FFFFFF;">
                     <option value="ALL" {% if branch_filter == 'ALL' %}selected{% endif %}>ทุกสาขา</option>
                     {% for b in branches %}
-                    <option value="{{ b }}" {% if branch_filter == b or (branch_filter == 'KORAT' and 'โคราช' in b) %}selected{% endif %}>{{ b }}</option>
+                    <option value="{{ b }}" {% if branch_filter == b %}selected{% endif %}>{{ b }}</option>
                     {% endfor %}
                 </select>
             </div>

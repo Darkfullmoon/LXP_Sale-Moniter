@@ -40,7 +40,7 @@
             <i data-lucide="clipboard-check"></i>
             <span>ตรวจ Morning Audit</span>
         </a>
-        {% if current_user.branch and 'โคราช' in current_user.branch %}
+        {% if current_user.branch %}
         <a href="{{ url_for('maid.maid_schedule') }}" class="btn-action-primary"
             style="background: linear-gradient(135deg, #DC2626, #B91C1C); box-shadow: 0 4px 15px rgba(220, 38, 38, 0.35);">
             <i data-lucide="brush"></i>
@@ -113,7 +113,7 @@
     </div>
 
     <!-- Card 3: Maid Schedule Reports -->
-    {% if current_user.role == 'ADMIN' or (current_user.branch and 'โคราช' in current_user.branch) %}
+    {% if current_user.role == 'ADMIN' or current_user.branch %}
     <div class="stat-card" style="border-top: 4px solid #0284C7;">
         <div class="stat-card-header">
             <span class="stat-card-title">ตารางการทำงานแม่บ้าน</span>
@@ -129,7 +129,7 @@
 </div>
 
 <!-- Section 1: Recent Maid Schedules Table (ประวัติตารางการทำงานแม่บ้าน) -->
-{% if current_user.role == 'ADMIN' or (current_user.branch and 'โคราช' in current_user.branch) %}
+{% if current_user.role == 'ADMIN' or current_user.branch %}
 <div class="content-card" style="margin-top: 24px; margin-bottom: 24px;">
     <div class="content-card-header">
         <div>

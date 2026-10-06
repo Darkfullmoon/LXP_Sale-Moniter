@@ -25,11 +25,11 @@ maid_bp = Blueprint('maid', __name__)
 
 
 def check_korat_or_admin_permission():
-    """Checks if the current user is ADMIN or assigned to Korat branch."""
+    """Checks if the current user is ADMIN or assigned to any branch."""
     if session.get('role') == 'ADMIN':
         return True
     user_branch = session.get('branch', '') or ''
-    return 'โคราช' in user_branch
+    return bool(user_branch)
 
 
 @maid_bp.route('/maid-schedule', methods=['GET', 'POST'])
@@ -44,11 +44,12 @@ def maid_schedule():
     is_admin = (session.get('role') == 'ADMIN')
 
     if request.method == 'POST':
-        # Non-admins are strictly locked to 4B โคราช
+        # Non-admins are locked to their assigned branch
         if not is_admin:
-            branch = '4B โคราช'
+            branch = session.get('branch', '') or (branches[0] if branches else '')
         else:
-            branch = request.form.get('branch', '4B โคราช').strip()
+            default_b = branches[0] if branches else ''
+            branch = request.form.get('branch', default_b).strip()
         month_year = request.form.get('month_year', default_month).strip()
         sheet_data_raw = request.form.get('sheet_data_json', '{}')
 
@@ -105,11 +106,12 @@ def maid_schedule():
 
     # GET Request
     if not is_admin:
-        selected_branch = '4B โคราช'
+        selected_branch = session.get('branch', '') or (branches[0] if branches else '')
     else:
-        selected_branch = request.args.get('branch', '4B โคราช').strip()
+        default_b = branches[0] if branches else ''
+        selected_branch = request.args.get('branch', default_b).strip()
         if not selected_branch and branches:
-            selected_branch = '4B โคราช'
+            selected_branch = branches[0]
 
     selected_month = request.args.get('month', default_month).strip()
     if len(selected_month) != 7 or '-' not in selected_month:
@@ -184,9 +186,10 @@ def maid_schedule_history():
         return redirect(url_for('dashboard.dashboard'))
 
     is_admin = (session.get('role') == 'ADMIN')
-    branch_filter = request.args.get('branch', '4B โคราช' if not is_admin else 'ALL')
+    user_branch = session.get('branch', '') or ''
+    branch_filter = request.args.get('branch', 'ALL' if is_admin else user_branch)
     if not is_admin:
-        branch_filter = '4B โคราช'
+        branch_filter = user_branch or 'ALL'
     month_filter = request.args.get('month', '').strip()
     search_query = request.args.get('q', '').strip()
 

@@ -46,7 +46,7 @@ def login():
                 )
                 user = cursor.fetchone()
 
-                # Auto-provision new 3-letter staff member on initial login with default password Landy*123
+                # Auto-provision new 3-letter staff member on initial login with default password Test*123
                 if not user and password == DEFAULT_INITIAL_PASSWORD:
                     default_hash = generate_password_hash(DEFAULT_INITIAL_PASSWORD)
                     cursor.execute(
@@ -80,7 +80,7 @@ def login():
                     flash(f"ยินดีต้อนรับผู้ดูแลระบบ {user['username']} เข้าสู่ระบบสำเร็จ!", "success")
                     return redirect(url_for('dashboard.dashboard'))
 
-                # Check 1: Initial Default Password (Landy*123) or is_first_login for regular users
+                # Check 1: Initial Default Password (Test*123) or is_first_login for regular users
                 is_initial_pw = (
                     user.get('is_first_login') == 1 or 
                     check_password_hash(user['password_hash'], DEFAULT_INITIAL_PASSWORD) or 

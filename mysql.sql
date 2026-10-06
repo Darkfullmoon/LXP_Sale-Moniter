@@ -38,20 +38,8 @@ CREATE TABLE `branches` (
 
 --
 -- Dumping data for table `branches`
---
+-- (Empty - ready for new branch entries)
 
-INSERT INTO `branches` (`id`, `name`, `is_active`, `created_at`) VALUES
-(1, '1A ลาดพร้าว', 1, '2026-08-19 08:32:11'),
-(2, '1B ลาดพร้าว', 1, '2026-08-19 08:32:11'),
-(3, '1C สุขุมวิท', 1, '2026-08-19 08:32:11'),
-(4, '1D บางนา', 1, '2026-08-19 08:32:11'),
-(5, '2A พงษ์เพชร', 1, '2026-08-19 08:32:11'),
-(6, '2B รามอินทรา', 1, '2026-08-19 08:32:11'),
-(7, '3A ราชพฤกษ์', 1, '2026-08-19 08:32:11'),
-(8, '3B ราชพฤกษ์', 1, '2026-08-19 08:32:11'),
-(9, '4A สระบุรี', 1, '2026-08-19 08:32:11'),
-(10, '4B โคราช', 1, '2026-08-19 08:32:11'),
-(11, '5A นครปฐม', 1, '2026-08-19 08:32:11');
 
 -- --------------------------------------------------------
 
@@ -173,7 +161,7 @@ INSERT INTO `users` (`id`, `username`, `password_hash`, `role`, `branch`, `passw
 (6, 'manager_sales', 'scrypt:32768:8:1$wmQwBkVAU3e2ILzj$f6aa764d8a06aabbe10b611a893bccef59de85a625595583428f2f7e923cb9639da796f1a59bc295933c0f6cefbdd5f528d3e17497b97d6e5fdc5eeac595af66', 'ADMIN', NULL, '2026-08-19 08:23:45', 0, '2026-08-19 06:56:27'),
 (7, 'KNG', 'scrypt:32768:8:1$KPvyMdTPZUJzjXyc$fff7243f49e6231218221b931bf7a417c8d7291b981c19b8337715c3172bf2845254165e126ec53cf48f7ac9170c0d6e104c87fa5ac066fb0f2f93ac92c0dc59', 'USER', NULL, '2026-08-19 07:01:10', 1, '2026-08-19 07:01:09'),
 (8, 'KOL', 'scrypt:32768:8:1$yQ8v4pS5wZENMMNw$324823494c737fb74ad676bcda6ef4cf20240e8db0a32dcb5f1c64842402700c26aa3c5062fcd5a1e5458f3c9c96486ee9b08f365d0bf4b52d58ef1bf76425d7', 'USER', NULL, '2026-08-19 07:09:17', 0, '2026-08-19 07:02:46'),
-(9, 'UIO', 'scrypt:32768:8:1$OvdflWFSPv156cDU$5acf0853def8198cb48a1a253969d13bff5542e93797b86bfb80e1af952a6fb3715c7b15e41ca57361e8f9fda9cd8849faeb0d31e8556a43375665fb082dc1ab', 'USER', '4B โคราช', '2026-08-19 07:27:22', 0, '2026-08-19 07:27:03'),
+(9, 'UIO', 'scrypt:32768:8:1$OvdflWFSPv156cDU$5acf0853def8198cb48a1a253969d13bff5542e93797b86bfb80e1af952a6fb3715c7b15e41ca57361e8f9fda9cd8849faeb0d31e8556a43375665fb082dc1ab', 'USER', NULL, '2026-08-19 07:27:22', 0, '2026-08-19 07:27:03'),
 (10, 'USE', 'scrypt:32768:8:1$Z3f8ZmAzZH1TnJBr$994b53e008b2a13d6afef0f8b87d7af5f0cce04bde3fa10a5954f65375ba23497e6d7e7f14815da3f15c74092a5d8bf848d5f0db118d054a8e811af08f50cc39', 'USER', NULL, '2026-09-01 02:48:01', 1, '2026-09-01 02:48:01');
 
 --
@@ -227,7 +215,7 @@ ALTER TABLE `users`
 -- AUTO_INCREMENT for table `branches`
 --
 ALTER TABLE `branches`
-  MODIFY `id` int NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=20;
+  MODIFY `id` int NOT NULL AUTO_INCREMENT;
 
 --
 -- AUTO_INCREMENT for table `daily_operation_reports`

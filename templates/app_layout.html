@@ -486,7 +486,7 @@
                     <i data-lucide="calendar-check-2" class="nav-icon"></i>
                     <span>บันทึกประจำวันช่วงเย็น</span>
                 </a>
-                {% if current_user.branch and 'โคราช' in current_user.branch %}
+                {% if current_user.branch %}
                 <a href="{{ url_for('maid.maid_schedule') }}"
                     class="nav-link {% if request.endpoint in ['maid_schedule', 'maid.maid_schedule'] %}active{% endif %}">
                     <i data-lucide="brush" class="nav-icon"></i>
@@ -506,7 +506,7 @@
                     <i data-lucide="archive" class="nav-icon"></i>
                     <span>บันทึกประจำวันช่วงเย็น</span>
                 </a>
-                {% if current_user.branch and 'โคราช' in current_user.branch %}
+                {% if current_user.branch %}
                 <a href="{{ url_for('maid.maid_schedule_history') }}"
                     class="nav-link {% if request.endpoint in ['maid_schedule_history', 'maid_schedule_detail', 'maid.maid_schedule_history', 'maid.maid_schedule_detail'] %}active{% endif %}">
                     <i data-lucide="brush" class="nav-icon"></i>

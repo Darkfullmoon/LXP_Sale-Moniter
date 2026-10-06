@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 Maid Work Schedule Checklist Configuration.
-Defines all 19 daily tasks and 4 weekly tasks from Landy Home FM Maid Schedule Form.
+Defines all 19 daily tasks and 4 weekly tasks for Sales Office Maid Schedule Form.
 """
 
 # Daily Tasks (ประจำวัน - ลำดับ 1 ถึง 19)

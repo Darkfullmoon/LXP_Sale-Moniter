@@ -35,9 +35,9 @@
                     </select>
                     {% else %}
                     <span style="font-weight: 600; font-size: 0.9rem; color: #1E293B; padding: 7px 14px; background: #F8FAFC; border: 1px solid #CBD5E1; border-radius: 8px; display: inline-flex; align-items: center;">
-                        <span>4B โคราช</span>
+                        <span>{{ current_user.branch or selected_branch }}</span>
                     </span>
-                    <input type="hidden" name="branch" value="4B โคราช">
+                    <input type="hidden" name="branch" value="{{ current_user.branch or selected_branch }}">
                     {% endif %}
                 </div>
 
@@ -123,7 +123,7 @@
                 <div
                     style="display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap;">
                     <div style="display: flex; align-items: center; gap: 14px;">
-                        <img src="{{ url_for('static', filename='img/landy_logo.png') }}" alt="Landy Logo"
+                        <img src="{{ url_for('static', filename='img/logo.png') }}" alt="Logo"
                             style="height: 40px; width: auto; object-fit: contain;">
                         <div>
                             <h2

@@ -25,7 +25,7 @@ load_dotenv(_env_path)
 # Constants
 USERNAME_PATTERN = r'^[A-Z]{3}$'  # Exactly 3 uppercase English letters
 PASSWORD_EXPIRY_DAYS = 90         # 3 months (90 days)
-DEFAULT_INITIAL_PASSWORD = "Landy*123"
+DEFAULT_INITIAL_PASSWORD = "Test*123"
 
 
 def generate_csrf_token():
@@ -69,7 +69,7 @@ def get_all_branches():
             cursor.execute("SELECT name FROM branches WHERE is_active = 1 ORDER BY id ASC")
             rows = cursor.fetchall()
         conn.close()
-        if rows:
+        if rows is not None:
             _BRANCHES_CACHE = [r['name'] for r in rows]
             _BRANCHES_CACHE_TIMESTAMP = now
             return _BRANCHES_CACHE
@@ -185,31 +185,10 @@ def enrich_daily_report_with_linked_audit(conn, report, manpower_data, team_staf
 
 
 def format_branch_filter(name):
-    """Ensures branch name always displays with its official code prefix."""
+    """Ensures branch name always displays cleanly."""
     if not name:
         return '-'
-    name_clean = str(name).strip()
-    if any(name_clean.startswith(prefix) for prefix in ['1A', '1B', '1C', '1D', '2A', '2B', '3A', '3B', '4A', '4B', '5A']):
-        return name_clean
-    if 'ลาดพร้าว' in name_clean:
-        return '1A ลาดพร้าว'
-    elif 'สุขุมวิท' in name_clean:
-        return '1C สุขุมวิท'
-    elif 'บางนา' in name_clean:
-        return '1D บางนา'
-    elif 'พงษ์เพชร' in name_clean:
-        return '2A พงษ์เพชร'
-    elif 'รามอินทรา' in name_clean:
-        return '2B รามอินทรา'
-    elif 'ราชพฤกษ์' in name_clean:
-        return '3A ราชพฤกษ์'
-    elif 'สระบุรี' in name_clean:
-        return '4A สระบุรี'
-    elif 'โคราช' in name_clean:
-        return '4B โคราช'
-    elif 'นครปฐม' in name_clean:
-        return '5A นครปฐม'
-    return name_clean
+    return str(name).strip()
 
 
 def format_date_dmy(val):
@@ -425,7 +404,7 @@ def generate_morning_audit_ai_analysis(ma):
         print("Error parsing audit data for AI:", e)
 
     system_instruction_text = (
-        "คุณคือผู้เชี่ยวชาญด้านการตรวจสอบและประกันคุณภาพมาตรฐานสำนักงานขาย (Sales Office Quality & Standard Auditor) ของแลนดี้ โฮม (Landy Home)\n"
+        "คุณคือผู้เชี่ยวชาญด้านการตรวจสอบและประกันคุณภาพมาตรฐานสำนักงานขาย (Sales Office Quality & Standard Auditor)\n"
         "หน้าที่ของคุณคือ วิเคราะห์ผลการตรวจ Morning Audit (แบบฟอร์ม FM-MS-007 Rev.00) ของสาขานี้ และสรุปรายงานสำหรับผู้บริหาร (Executive Management Report)\n\n"
         "โครงสร้างรายงานที่คุณต้องสรุป:\n"
         "### 1. Executive Summary (สรุปภาพรวมผู้บริหาร)\n"
@@ -760,14 +739,14 @@ def analyze_staff_photo_with_gemini(photo_input, reported_count=0, custom_prompt
     if ref_image_parts:
         uniform_ref_instruction = (
             "- ภาพตัวอย่างชุดยูนิฟอร์มอ้างอิงมาตรฐาน (Reference Uniforms): มีภาพตัวอย่างชุดมาตรฐานแนบมาด้วย ซึ่งอนุญาต 2 รูปแบบที่ถูกต้องตามเกณฑ์:\n"
-            "  1. แบบเสื้อโปโล: เสื้อโปโลสีขาวของแลนดี้ โฮม (มีป้ายโลโก้ที่อกเสื้อ) + กางเกงขายาวสีดำ/สีเข้มสุภาพ + รองเท้าสุภาพ\n"
+            "  1. แบบเสื้อโปโล: เสื้อโปโลสีขาวมาตรฐาน (มีป้ายโลโก้ที่อกเสื้อ) + กางเกงขายาวสีดำ/สีเข้มสุภาพ + รองเท้าสุภาพ\n"
             "  2. แบบชุดสูทสากลทางการ: เสื้อสูทสีดำ/กรมท่า/เทาเข้ม สวมทับเสื้อเชิ้ตสีขาวด้านใน + กางเกง/กระโปรงสุภาพ + รองเท้าสุภาพ\n"
             "  (ทั้ง 2 รูปแบบนี้ถือว่าถูกต้องตามระเบียบบริษัททั้งคู่ ให้ประเมิน dress_code_status = 'PASS')\n"
             "  หากพนักงานสวมเสื้อแฟชั่น, เสื้อยืดคอกลมไม่มีปก, หรือเสื้อเชิ้ตลำลองโดยไม่มีสูท ให้ระบุ dress_code_status = 'FAIL' หรือ 'WARN'\n"
         )
 
     system_instruction = (
-        "คุณคือ AI ผู้เชี่ยวชาญด้านการตรวจสอบและประกันมาตรฐานบุคลากรของแลนดี้ โฮม (Landy Home Staff & Uniform Inspector)\n"
+        "คุณคือ AI ผู้เชี่ยวชาญด้านการตรวจสอบและประกันมาตรฐานบุคลากรสำนักงานขาย (Sales Office Staff & Uniform Inspector)\n"
         "หน้าที่ของคุณคือ วิเคราะห์ภาพถ่ายแรกที่แนบมา ซึ่งเป็นภาพถ่ายพนักงาน/บุคคลประจำสำนักงานขาย:\n\n"
         "1. กฎการตรวจสอบความถูกต้องของภาพถ่ายจริง (Anti-Spoofing & Screen Photo Prohibition - กฎเหล็ก ไม่อนุญาตให้ถ่ายจากจอ):\n"
         "- ไม่อนุญาตให้ใช้กล้องถ่ายภาพซ้ำจากหน้าจอคอมพิวเตอร์, หน้าจอมอนิเตอร์, แท็บเล็ต, มือถือ, หรือรูปถ่ายบนกระดาษ/โปสเตอร์ โดยเด็ดขาด (ห้ามอนุโลม)\n"
@@ -789,7 +768,7 @@ def analyze_staff_photo_with_gemini(photo_input, reported_count=0, custom_prompt
         "- หากไม่พบพนักงาน: is_full_body = false, full_body_status = 'NO_STAFF', full_body_summary = 'ไม่พบพนักงานในภาพถ่าย'\n\n"
         "4. กฎการตรวจสอบการแต่งกาย (Uniform & Dress Code):\n"
         + uniform_ref_instruction +
-        "- ตรวจสอบการแต่งกาย เช่น เสื้อโปโลยูนิฟอร์มแลนดี้โฮม, เสื้อเชิ้ต/สูท, กางเกง/กระโปรงสุภาพ, รองเท้า และความเรียบร้อย\n\n"
+        "- ตรวจสอบการแต่งกาย เช่น เสื้อโปโลยูนิฟอร์มองค์กร, เสื้อเชิ้ต/สูท, กางเกง/กระโปรงสุภาพ, รองเท้า และความเรียบร้อย\n\n"
         "5. โครงสร้าง JSON ที่ต้องส่งกลับ:\n"
         "{\n"
         '  "is_screen_photo": false,\n'

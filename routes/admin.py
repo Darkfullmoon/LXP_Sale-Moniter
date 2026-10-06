@@ -417,13 +417,7 @@ def admin_users():
         for u in all_users:
             if search_q and search_q not in u['username']:
                 continue
-            if branch_filter == 'KORAT':
-                if not (u.get('branch') and 'โคราช' in u.get('branch')):
-                    continue
-            elif branch_filter == 'NON_KORAT':
-                if u.get('branch') and 'โคราช' in u.get('branch'):
-                    continue
-            elif branch_filter != 'ALL':
+            if branch_filter != 'ALL':
                 if u.get('branch') != branch_filter:
                     continue
             filtered_users.append(u)
@@ -477,8 +471,7 @@ def admin_add_user():
             """, (username, pw_hash, role, branch))
         conn.close()
 
-        korat_info = " (กำหนดเป็นสาขา 4B โคราช - มีสิทธิ์ทำตารางแม่บ้าน)" if branch and 'โคราช' in branch else ""
-        flash(f"เพิ่มผู้ใช้งาน '{username}'{korat_info} เรียบร้อยแล้ว (รหัสผ่านเริ่มต้น: {password})", "success")
+        flash(f"เพิ่มผู้ใช้งาน '{username}' เรียบร้อยแล้ว (รหัสผ่านเริ่มต้น: {password})", "success")
     except Exception as e:
         flash(f"เกิดข้อผิดพลาดในการเพิ่มผู้ใช้งาน: {e}", "error")
 
@@ -612,22 +605,11 @@ def admin_set_user_branch():
                 return redirect(url_for('admin.admin_users'))
 
             new_branch = None
-            if action == 'toggle_korat':
-                current_b = target.get('branch') or ''
-                if 'โคราช' in current_b:
-                    new_branch = None
-                    msg = f"ยกเลิกสถานะสาขาโคราชสำหรับ '{target['username']}' เรียบร้อยแล้ว (จะมองไม่เห็นเมนูตารางแม่บ้าน)"
-                else:
-                    new_branch = '4B โคราช'
-                    msg = f"กำหนดให้ '{target['username']}' สังกัดสาขา 4B โคราช เรียบร้อยแล้ว (จะมองเห็นและทำตารางแม่บ้านได้)"
+            new_branch = branch if branch else None
+            if new_branch:
+                msg = f"กำหนดสาขา '{new_branch}' ให้กับ '{target['username']}' เรียบร้อยแล้ว"
             else:
-                new_branch = branch if branch else None
-                if new_branch and 'โคราช' in new_branch:
-                    msg = f"กำหนดสาขา '{new_branch}' ให้กับ '{target['username']}' เรียบร้อยแล้ว (มีสิทธิ์ทำตารางแม่บ้าน)"
-                elif new_branch:
-                    msg = f"กำหนดสาขา '{new_branch}' ให้กับ '{target['username']}' เรียบร้อยแล้ว"
-                else:
-                    msg = f"ยกเลิกการผูกสาขาสำหรับ '{target['username']}' เรียบร้อยแล้ว"
+                msg = f"ยกเลิกการผูกสาขาสำหรับ '{target['username']}' เรียบร้อยแล้ว"
 
             cursor.execute("UPDATE users SET branch = %s WHERE id = %s", (new_branch, user_id_int))
         conn.close()

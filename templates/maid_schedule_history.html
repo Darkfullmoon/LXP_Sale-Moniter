@@ -47,9 +47,9 @@
             <div style="display: flex; align-items: center; gap: 6px;">
                 <label style="font-size: 0.86rem; font-weight: 700; color: #334155;">สาขา:</label>
                 <span style="font-weight: 600; font-size: 0.9rem; color: #1E293B; padding: 6px 12px; background: #F8FAFC; border: 1px solid #CBD5E1; border-radius: 8px; display: inline-flex; align-items: center;">
-                    <span>4B โคราช</span>
+                    <span>{{ current_user.branch or current_branch }}</span>
                 </span>
-                <input type="hidden" name="branch" value="4B โคราช">
+                <input type="hidden" name="branch" value="{{ current_user.branch or current_branch }}">
             </div>
             {% endif %}
 

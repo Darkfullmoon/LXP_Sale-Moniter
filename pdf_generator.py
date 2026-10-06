@@ -93,31 +93,10 @@ def format_date_dmy(val):
 
 
 def format_branch_name(name):
-    """Formats branch name with code prefix."""
+    """Formats branch name cleanly."""
     if not name:
         return '-'
-    name_clean = str(name).strip()
-    if any(name_clean.startswith(prefix) for prefix in ['1A', '1B', '1C', '1D', '2A', '2B', '3A', '3B', '4A', '4B', '5A']):
-        return name_clean
-    if 'ลาดพร้าว' in name_clean:
-        return '1A ลาดพร้าว'
-    elif 'สุขุมวิท' in name_clean:
-        return '1C สุขุมวิท'
-    elif 'บางนา' in name_clean:
-        return '1D บางนา'
-    elif 'พงษ์เพชร' in name_clean:
-        return '2A พงษ์เพชร'
-    elif 'รามอินทรา' in name_clean:
-        return '2B รามอินทรา'
-    elif 'ราชพฤกษ์' in name_clean:
-        return '3A ราชพฤกษ์'
-    elif 'สระบุรี' in name_clean:
-        return '4A สระบุรี'
-    elif 'โคราช' in name_clean:
-        return '4B โคราช'
-    elif 'นครปฐม' in name_clean:
-        return '5A นครปฐม'
-    return name_clean
+    return str(name).strip()
 
 
 # ================= 1. MORNING AUDIT PDF (FM-MS-007) =================
@@ -1002,12 +981,12 @@ def generate_maid_schedule_pdf(schedule, sheet_data):
 
     # 1. Header with Logo & Title
     logo_flowable = None
-    logo_path = os.path.join(os.path.dirname(__file__), 'static', 'img', 'landy_logo.png')
+    logo_path = os.path.join(os.path.dirname(__file__), 'static', 'img', 'logo.png')
     if os.path.exists(logo_path):
         try:
             logo_flowable = RLImage(logo_path, width=70, height=28)
         except Exception:
-            logo_flowable = Paragraph("<b>LANDY HOME</b>", th_center)
+            logo_flowable = Paragraph("<b>SALES OFFICE</b>", th_center)
 
     header_cell_left = [
         Paragraph("<b>ตารางการทำงานแม่บ้าน สำนักงานขายประจำวัน</b>", title_style),

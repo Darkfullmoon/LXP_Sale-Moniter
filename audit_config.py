@@ -4,19 +4,7 @@ Morning Audit Configuration and Structure (FM-MS-007 Rev.00)
 รายงาน Morning Audit สำนักงานขาย (ประจำวัน)
 """
 
-BRANCH_LIST = [
-    "1A ลาดพร้าว",
-    "1B ลาดพร้าว",
-    "1C สุขุมวิท",
-    "1D บางนา",
-    "2A พงษ์เพชร",
-    "2B รามอินทรา",
-    "3A ราชพฤกษ์",
-    "3B ราชพฤกษ์",
-    "4A สระบุรี",
-    "4B โคราช",
-    "5A นครปฐม"
-]
+BRANCH_LIST = []
 
 MORNING_AUDIT_STRUCTURE = [
     {

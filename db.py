@@ -210,23 +210,13 @@ def init_db():
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
             """)
 
-            # Seed default branches if empty
-            cursor.execute("SELECT COUNT(*) as count FROM branches")
-            b_count = cursor.fetchone()
-            if b_count and b_count['count'] == 0:
-                default_branches = [
-                    "1A ลาดพร้าว", "1B ลาดพร้าว", "1C สุขุมวิท", "1D บางนา",
-                    "2A พงษ์เพชร", "2B รามอินทรา", "3A ราชพฤกษ์", "3B ราชพฤกษ์",
-                    "4A สระบุรี", "4B โคราช", "5A นครปฐม"
-                ]
-                for b_name in default_branches:
-                    cursor.execute("INSERT IGNORE INTO branches (name, is_active) VALUES (%s, 1)", (b_name,))
-                print("[DB INIT] Seeded 11 initial branches into branches table.")
+            # Branches table is created clean without hardcoded branches, ready for new entries via Admin menu
+            # (No initial branches seeded)
 
-            # Seed default 3-letter uppercase accounts with initial default password Landy*123
-            default_init_hash = generate_password_hash("Landy*123")
+            # Seed default 3-letter uppercase accounts with initial default password Test*123
+            default_init_hash = generate_password_hash("Test*123")
 
-            # Default ADM (Role: ADMIN, Default Password: Landy*123, is_first_login: 1)
+            # Default ADM (Role: ADMIN, Default Password: Test*123, is_first_login: 1)
             cursor.execute("SELECT id, role, is_first_login FROM users WHERE username = %s", ("ADM",))
             adm_user = cursor.fetchone()
             if not adm_user:
@@ -234,12 +224,12 @@ def init_db():
                     "INSERT INTO users (username, password_hash, role, password_changed_at, is_first_login) VALUES (%s, %s, %s, NOW(), 1)",
                     ("ADM", default_init_hash, "ADMIN")
                 )
-                print("[DB INIT] Created default admin user: ADM (Role: ADMIN, Initial Password: Landy*123)")
+                print("[DB INIT] Created default admin user: ADM (Role: ADMIN, Initial Password: Test*123)")
             else:
-                # Update to ensure role and password can be used with Landy*123
+                # Update to ensure role and password can be used with Test*123
                 cursor.execute("UPDATE users SET password_hash = %s, role = 'ADMIN', is_first_login = 1 WHERE username = 'ADM'", (default_init_hash,))
 
-            # Default USR (Role: USER, Default Password: Landy*123, is_first_login: 1)
+            # Default USR (Role: USER, Default Password: Test*123, is_first_login: 1)
             cursor.execute("SELECT id FROM users WHERE username = %s", ("USR",))
             usr_user = cursor.fetchone()
             if not usr_user:
@@ -247,7 +237,7 @@ def init_db():
                     "INSERT INTO users (username, password_hash, role, password_changed_at, is_first_login) VALUES (%s, %s, %s, NOW(), 1)",
                     ("USR", default_init_hash, "USER")
                 )
-                print("[DB INIT] Created default user: USR (Role: USER, Initial Password: Landy*123)")
+                print("[DB INIT] Created default user: USR (Role: USER, Initial Password: Test*123)")
             else:
                 cursor.execute("UPDATE users SET password_hash = %s, role = 'USER', is_first_login = 1 WHERE username = 'USR'", (default_init_hash,))
 
